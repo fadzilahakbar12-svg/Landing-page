@@ -12,14 +12,24 @@ export async function GET(request) {
 
   const results = [];
   for (const lead of pending) {
+    const errors = [];
+
     try {
       await sendFollowUpEmail(lead);
-      await sendFollowUpWhatsapp(lead);
-      await markLeadFollowedUp(lead.row);
-      results.push({ row: lead.row, name: lead.name, ok: true });
     } catch (err) {
-      results.push({ row: lead.row, name: lead.name, ok: false, error: String(err) });
+      errors.push(`email: ${err}`);
     }
+
+    try {
+      await sendFollowUpWhatsapp(lead);
+    } catch (err) {
+      errors.push(`whatsapp: ${err}`);
+    }
+
+    // Mark as handled either way — an attempt was made for both channels,
+    // so we don't want to keep re-sending the ones that did succeed.
+    await markLeadFollowedUp(lead.row);
+    results.push({ row: lead.row, name: lead.name, ok: errors.length === 0, errors });
   }
 
   return Response.json({ ok: true, processed: results.length, results });
