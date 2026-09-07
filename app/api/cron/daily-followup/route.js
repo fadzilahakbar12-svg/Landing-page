@@ -1,4 +1,4 @@
-import { fetchLeads, markLeadFollowedUp } from "@/lib/leads";
+import { fetchLeads, markLeadFollowedUp, setLeadWaMeta } from "@/lib/leads";
 import { sendFollowUpEmail, sendFollowUpWhatsapp } from "@/lib/notify";
 
 export async function GET(request) {
@@ -21,7 +21,8 @@ export async function GET(request) {
     }
 
     try {
-      await sendFollowUpWhatsapp(lead);
+      const { fonnteMessageId } = await sendFollowUpWhatsapp(lead);
+      await setLeadWaMeta(lead.row, { status: "sent", fonnteMessageId });
     } catch (err) {
       errors.push(`whatsapp: ${err}`);
     }
