@@ -22,14 +22,21 @@ export default function LeadForm() {
 
     setStatus("loading");
 
-    // TODO: ganti bagian ini nanti dengan pengiriman data yang sebenarnya
-    // (misalnya ke Google Sheets, database, atau email). Untuk sekarang
-    // datanya cuma disimpan di console browser sebagai contoh.
-    console.log("Lead baru:", { name, whatsapp, email });
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    try {
+      const res = await fetch("/api/lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, whatsapp, email }),
+      });
 
-    setStatus("done");
-    form.reset();
+      if (!res.ok) throw new Error("Gagal mengirim data.");
+
+      setStatus("done");
+      form.reset();
+    } catch {
+      setStatus("idle");
+      setError("Gagal mengirim data. Coba lagi ya.");
+    }
   }
 
   if (status === "done") {
