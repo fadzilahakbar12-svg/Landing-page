@@ -24,8 +24,13 @@ export async function POST(request) {
   const lead = await findLeadByFonnteMessageId(id);
   if (!lead) return Response.json({ ok: true, skipped: "no matching lead" });
 
-  // Only "upgrade" the funnel stage — never downgrade read/connected back to sent.
-  if (statusText.includes("read") && lead.waStatus !== "connected") {
+  const alreadyEngaged = lead.waStatus === "connected" || lead.waStatus === "read";
+
+  if ((statusText.includes("fail") || statusText.includes("error")) && lead.waStatus !== "connected") {
+    // A delivery failure after "read"/"connected" would just be noise (e.g. a
+    // later message in the same thread) — only flag it while still unengaged.
+    if (!alreadyEngaged) await setLeadWaMeta(lead.row, { status: "fail" });
+  } else if (statusText.includes("read") && lead.waStatus !== "connected") {
     await setLeadWaMeta(lead.row, { status: "read" });
   }
 

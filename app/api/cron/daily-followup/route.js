@@ -25,6 +25,7 @@ export async function GET(request) {
       await setLeadWaMeta(lead.row, { status: "sent", fonnteMessageId });
     } catch (err) {
       errors.push(`whatsapp: ${err}`);
+      await setLeadWaMeta(lead.row, { status: "fail" });
     }
 
     // Mark as handled either way — an attempt was made for both channels,
