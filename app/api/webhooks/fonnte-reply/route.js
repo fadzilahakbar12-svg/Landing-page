@@ -20,9 +20,9 @@ export async function POST(request) {
   if (!sender) return Response.json({ ok: true, skipped: "no sender" });
 
   const lead = await findLeadByPhone(sender);
-  if (!lead) return Response.json({ ok: true, skipped: "no matching lead" });
+  if (!lead) return Response.json({ ok: true, skipped: "no matching lead", sender });
 
-  await setLeadWaMeta(lead.row, { status: "connected" });
+  const setResult = await setLeadWaMeta(lead.row, { status: "connected" });
 
-  return Response.json({ ok: true });
+  return Response.json({ ok: true, debug: { sender, foundRow: lead.row, setResult } });
 }
