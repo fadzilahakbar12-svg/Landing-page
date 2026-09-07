@@ -14,6 +14,7 @@ export default function LeadForm() {
     const name = form.name.value.trim();
     const whatsapp = form.whatsapp.value.trim();
     const email = form.email.value.trim();
+    const website = form.website.value; // honeypot — real visitors never fill this
 
     if (!name || !whatsapp || !email) {
       setError("Semua kolom wajib diisi ya.");
@@ -26,7 +27,7 @@ export default function LeadForm() {
       const res = await fetch("/api/lead", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, whatsapp, email }),
+        body: JSON.stringify({ name, whatsapp, email, website }),
       });
 
       if (!res.ok) throw new Error("Gagal mengirim data.");
@@ -55,6 +56,16 @@ export default function LeadForm() {
       onSubmit={handleSubmit}
       className="mt-8 flex w-full max-w-sm flex-col gap-3 text-left"
     >
+      {/* Honeypot — hidden from real visitors via CSS, bots fill every field blindly */}
+      <input
+        type="text"
+        name="website"
+        tabIndex={-1}
+        autoComplete="off"
+        className="absolute left-[-9999px] h-0 w-0 opacity-0"
+        aria-hidden="true"
+      />
+
       <div>
         <label htmlFor="name" className="mb-1 block text-sm font-medium text-zinc-700">
           Nama
