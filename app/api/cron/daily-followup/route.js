@@ -7,8 +7,14 @@ export async function GET(request) {
     return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
+  // Dipanggil 2x sehari (lihat vercel.json) -- dibatasi 25 lead per PANGGILAN
+  // (bukan per hari) supaya volume kirim WA ke kontak dingin tetap terkendali
+  // dan tidak memicu deteksi spam WhatsApp. Lead yang tersisa otomatis
+  // kebagian di panggilan cron berikutnya karena masih punya followUpSentAt
+  // kosong.
+  const MAX_PER_BATCH = 25;
   const leads = await fetchLeads();
-  const pending = leads.filter((lead) => !lead.followUpSentAt);
+  const pending = leads.filter((lead) => !lead.followUpSentAt).slice(0, MAX_PER_BATCH);
 
   const results = [];
   for (const lead of pending) {

@@ -2,7 +2,11 @@
   "crons": [
     {
       "path": "/api/cron/daily-followup",
-      "schedule": "0 2 * * 1-5"
+      "schedule": "30 3 * * 1-5"
+    },
+    {
+      "path": "/api/cron/daily-followup",
+      "schedule": "30 6 * * 1-5"
     }
   ]
 }
