@@ -18,17 +18,19 @@ export async function POST(request) {
     return Response.json({ ok: false, error: "URL/domain wajib diisi." }, { status: 400 });
   }
 
-  // Terima baik "https://situs.id/lowongan" maupun "situs.id" -- ambil hostname-nya saja.
-  let domain = raw;
+  // Terima baik "https://situs.id/lowongan" maupun "situs.id" -- normalisasi
+  // jadi URL LENGKAP (tambah https:// kalau belum ada protokol). URL lengkap
+  // (bukan cuma hostname) yang disimpan -- itu titik mulai scraper (Fase 5).
+  let normalizedUrl;
   try {
-    domain = new URL(raw.includes("://") ? raw : `https://${raw}`).hostname.replace(/^www\./, "");
+    normalizedUrl = new URL(raw.includes("://") ? raw : `https://${raw}`).href;
   } catch {
     return Response.json({ ok: false, error: "URL tidak valid." }, { status: 400 });
   }
 
   try {
-    await addSite(domain);
-    return Response.json({ ok: true, domain });
+    await addSite(normalizedUrl);
+    return Response.json({ ok: true, url: normalizedUrl });
   } catch (err) {
     // Kegagalan di sini umumnya karena input (mis. domain duplikat), bukan
     // server down -- 400 lebih tepat daripada 502 supaya form bisa tampilkan
