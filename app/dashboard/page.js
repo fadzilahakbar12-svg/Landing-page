@@ -1,6 +1,29 @@
 import { fetchLeads } from "@/lib/leads";
+import { fetchSites } from "@/lib/sites";
+import AddSiteForm from "./AddSiteForm";
 
 export const dynamic = "force-dynamic";
+
+const PRIORITY_ORDER = { Tinggi: 0, Sedang: 1, Rendah: 2, Baru: 3 };
+const PRIORITY_BADGE = {
+  Tinggi: "bg-green-50 text-green-700",
+  Sedang: "bg-amber-50 text-amber-700",
+  Rendah: "bg-zinc-100 text-zinc-600",
+  Baru: "border border-dashed border-zinc-300 text-zinc-500",
+};
+
+function formatRelative(dateValue) {
+  if (!dateValue) return "belum pernah";
+  const d = new Date(dateValue);
+  if (Number.isNaN(d.getTime())) return "belum pernah";
+  const diffMs = Date.now() - d.getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "baru saja";
+  if (mins < 60) return `${mins} menit lalu`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} jam lalu`;
+  return `${Math.floor(hours / 24)} hari lalu`;
+}
 
 const STATUS_META = {
   pending: { label: "Menunggu", color: "text-zinc-500", bg: "bg-zinc-50" },
@@ -32,12 +55,24 @@ function pct(numerator, denominator) {
 export default async function DashboardPage() {
   let leads = [];
   let loadError = null;
+  let sites = [];
+  let sitesError = null;
 
   try {
     leads = await fetchLeads();
   } catch (err) {
     loadError = String(err);
   }
+
+  try {
+    sites = await fetchSites();
+  } catch (err) {
+    sitesError = String(err);
+  }
+
+  const sortedSites = [...sites].sort(
+    (a, b) => (PRIORITY_ORDER[a.priority] ?? 4) - (PRIORITY_ORDER[b.priority] ?? 4)
+  );
 
   const total = leads.length;
   const counts = computeCounts(leads);
@@ -94,6 +129,65 @@ export default async function DashboardPage() {
               <dd className="text-base font-bold text-green-700">{pct(counts.connected, total)}</dd>
             </div>
           </dl>
+        </div>
+
+        <div className="mt-8">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-zinc-900">Performa Situs</h2>
+            <AddSiteForm />
+          </div>
+          <p className="mt-1 text-xs text-zinc-400">
+            Watchlist situs yang di-scan otomatis. Situs bertanda &quot;perlu manual&quot; butuh
+            BarScraper (belum bisa full-otomatis).
+          </p>
+
+          {sitesError && (
+            <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              Gagal memuat watchlist situs: {sitesError}
+            </div>
+          )}
+
+          {!sitesError && sortedSites.length === 0 && (
+            <div className="mt-3 rounded-xl border border-dashed border-zinc-200 p-6 text-center text-sm text-zinc-400">
+              Belum ada situs di watchlist. Klik &quot;+ Tambah Situs&quot; untuk mulai.
+            </div>
+          )}
+
+          {!sitesError && sortedSites.length > 0 && (
+            <div className="mt-3 overflow-x-auto rounded-2xl border border-zinc-200">
+              <table className="w-full min-w-[560px] text-left text-sm">
+                <thead className="bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500">
+                  <tr>
+                    <th className="px-4 py-3">Situs</th>
+                    <th className="px-4 py-3">Loker Ditemukan</th>
+                    <th className="px-4 py-3">Sukses Ekstraksi</th>
+                    <th className="px-4 py-3">Prioritas</th>
+                    <th className="px-4 py-3">Terakhir Discan</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedSites.map((site) => (
+                    <tr key={site.domain} className="border-t border-zinc-100">
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-zinc-900">{site.domain}</p>
+                        {site.needsManualScrape && (
+                          <p className="text-xs text-amber-600">perlu manual (BarScraper)</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 tabular-nums text-zinc-700">{site.jobsFound || "—"}</td>
+                      <td className="px-4 py-3 tabular-nums text-zinc-700">{site.successRate || "—"}</td>
+                      <td className="px-4 py-3">
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${PRIORITY_BADGE[site.priority] || PRIORITY_BADGE.Baru}`}>
+                          {site.priority || "Baru"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-zinc-500">{formatRelative(site.lastScanned)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </main>
