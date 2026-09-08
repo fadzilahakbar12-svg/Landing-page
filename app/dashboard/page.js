@@ -12,6 +12,18 @@ const PRIORITY_BADGE = {
   Baru: "border border-dashed border-zinc-300 text-zinc-500",
 };
 
+// Google Sheets otomatis mengubah value seperti "93%" (string) yang ditulis
+// lewat API jadi angka desimal 0.93 dengan format tampilan persen di sisi
+// Sheets -- tapi lewat JSON API, yang kita terima ya angka mentahnya (0.93),
+// bukan "93%". Tangani KEDUA kemungkinan bentuk supaya tetap tampil benar.
+function formatSuccessRate(value) {
+  if (value === null || value === undefined || value === "") return "—";
+  if (typeof value === "string" && value.trim().endsWith("%")) return value;
+  const num = Number(value);
+  if (Number.isNaN(num)) return "—";
+  return `${Math.round(num * 100)}%`;
+}
+
 function formatRelative(dateValue) {
   if (!dateValue) return "belum pernah";
   const d = new Date(dateValue);
@@ -175,7 +187,7 @@ export default async function DashboardPage() {
                         )}
                       </td>
                       <td className="px-4 py-3 tabular-nums text-zinc-700">{site.jobsFound || "—"}</td>
-                      <td className="px-4 py-3 tabular-nums text-zinc-700">{site.successRate || "—"}</td>
+                      <td className="px-4 py-3 tabular-nums text-zinc-700">{formatSuccessRate(site.successRate)}</td>
                       <td className="px-4 py-3">
                         <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${PRIORITY_BADGE[site.priority] || PRIORITY_BADGE.Baru}`}>
                           {site.priority || "Baru"}
