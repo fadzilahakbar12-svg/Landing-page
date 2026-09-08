@@ -7,14 +7,15 @@ const STATUS_META = {
   sent: { label: "Terkirim", color: "text-zinc-600", bg: "bg-zinc-50" },
   read: { label: "Dibaca", color: "text-blue-600", bg: "bg-blue-50" },
   connected: { label: "Terhubung", color: "text-green-600", bg: "bg-green-50" },
+  manual: { label: "Ditangani Manual", color: "text-amber-600", bg: "bg-amber-50" },
   fail: { label: "Gagal", color: "text-red-600", bg: "bg-red-50" },
 };
 
 function computeCounts(leads) {
-  const counts = { pending: 0, sent: 0, read: 0, connected: 0, fail: 0 };
+  const counts = { pending: 0, sent: 0, read: 0, connected: 0, manual: 0, fail: 0 };
   for (const lead of leads) {
     const status = lead.waStatus;
-    if (status === "read" || status === "connected" || status === "fail" || status === "sent") {
+    if (status === "read" || status === "connected" || status === "fail" || status === "sent" || status === "manual") {
       counts[status]++;
     } else {
       counts.pending++;
@@ -63,7 +64,7 @@ export default async function DashboardPage() {
           <p className="mt-1 text-4xl font-bold text-zinc-900">{total}</p>
         </div>
 
-        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-5">
+        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
           {Object.entries(STATUS_META).map(([key, meta]) => (
             <div key={key} className={`rounded-xl border border-zinc-200 p-4 ${meta.bg}`}>
               <p className="text-xs font-medium text-zinc-500">{meta.label}</p>
