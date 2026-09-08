@@ -32,27 +32,14 @@ export default function EngineToggle({ initialEnabled }) {
   }
 
   return (
-    <div className="relative inline-block">
-      <button
-        onClick={toggle}
-        disabled={loading}
-        className={`rounded-full px-5 py-2.5 text-sm font-semibold text-white transition-colors disabled:opacity-60 ${
-          enabled ? "bg-red-600 hover:bg-red-700" : "bg-blue-600 hover:bg-blue-700"
-        }`}
-      >
+    <div className="db-engine-wrap">
+      <button onClick={toggle} disabled={loading} className={`db-engine-btn ${enabled ? "is-on" : "is-off"}`}>
         {loading ? "..." : enabled ? "⏹ Stop Engine" : "▶ Mulai Scrape"}
       </button>
 
-      {/* Indikator pulse: hijau berdenyut saat engine jalan, abu-abu diam saat mati */}
-      <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
-        {enabled && (
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
-        )}
-        <span
-          className={`relative inline-flex h-3.5 w-3.5 rounded-full border-2 border-white ${
-            enabled ? "bg-green-500" : "bg-zinc-400"
-          }`}
-        />
+      <span className="db-engine-dot-wrap">
+        {enabled && <span className="db-engine-dot-ping" />}
+        <span className={`db-engine-dot ${enabled ? "on" : "off"}`} />
       </span>
     </div>
   );

@@ -39,40 +39,32 @@ export default function AddSiteForm() {
 
   if (!open) {
     return (
-      <button
-        onClick={() => setOpen(true)}
-        className="rounded-full border border-dashed border-zinc-300 px-4 py-1.5 text-xs font-medium text-zinc-600 hover:border-zinc-400 hover:text-zinc-900"
-      >
+      <button onClick={() => setOpen(true)} className="db-add-site-btn">
         + Tambah Situs
       </button>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex items-center gap-2">
+    <form onSubmit={handleSubmit} className="db-add-site-form">
       <input
         type="text"
         autoFocus
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder="https://loker-yang-anda-temukan.id"
-        className="w-64 rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
       />
-      <button
-        type="submit"
-        disabled={status === "loading"}
-        className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
-      >
+      <button type="submit" disabled={status === "loading"} className="db-add-site-submit">
         {status === "loading" ? "..." : "Tambah"}
       </button>
       <button
         type="button"
         onClick={() => { setOpen(false); setError(""); }}
-        className="text-sm text-zinc-500 hover:text-zinc-800"
+        className="db-add-site-cancel"
       >
         Batal
       </button>
-      {error && <span className="text-xs text-red-600">{error}</span>}
+      {error && <span className="db-add-site-error">{error}</span>}
     </form>
   );
 }
