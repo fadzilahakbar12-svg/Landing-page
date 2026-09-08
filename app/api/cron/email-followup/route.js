@@ -1,12 +1,13 @@
 import { fetchLeads, markLeadEmailSent } from "@/lib/leads";
 import { sendFollowUpEmail } from "@/lib/notify";
+import { getEngineState } from "@/lib/engine";
 
 // Email-only pipeline -- split from WhatsApp on purpose (see wa-followup/route.js).
-// Email tolerates a much higher daily volume than cold WhatsApp, and re-sends
-// on its own 7-day cooldown instead of being a one-shot "already contacted"
-// flag, so it needed its own schedule, cap, and columns (EmailSentAt/emailStatus)
-// entirely separate from WhatsApp's.
-const MAX_PER_DAY = 100;
+// Sekarang jalan 2 batch/hari (sama seperti WA) dalam jam operasional 09.00-
+// 18.00 WIB (lihat vercel.json) -- dibatasi per BATCH (bukan per hari) supaya
+// total harian tetap terkendali (~2x MAX_PER_BATCH), re-send otomatis lewat
+// cooldown 7 hari kalau belum ada yang klik CTA.
+const MAX_PER_BATCH = 50;
 const COOLDOWN_DAYS = 7;
 const COOLDOWN_MS = COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
 
@@ -30,8 +31,13 @@ export async function GET(request) {
     return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
+  const engineEnabled = await getEngineState();
+  if (!engineEnabled) {
+    return Response.json({ ok: true, skipped: true, reason: "Engine sedang mati (belum diaktifkan dari dashboard)." });
+  }
+
   const leads = await fetchLeads();
-  const pending = leads.filter(isEligible).slice(0, MAX_PER_DAY);
+  const pending = leads.filter(isEligible).slice(0, MAX_PER_BATCH);
 
   const results = [];
   for (const lead of pending) {

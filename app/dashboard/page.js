@@ -1,6 +1,10 @@
 import { fetchLeads } from "@/lib/leads";
 import { fetchSites } from "@/lib/sites";
+import { getEngineState } from "@/lib/engine";
 import AddSiteForm from "./AddSiteForm";
+import EngineToggle from "./EngineToggle";
+
+const BANK_DATA_URL = "https://docs.google.com/spreadsheets/d/1JxV1UAq_c-erM_28UojQ7yKW-JraFrXpEgcCIpVLukQ/edit?gid=0#gid=0";
 
 export const dynamic = "force-dynamic";
 
@@ -82,6 +86,14 @@ export default async function DashboardPage() {
     sitesError = String(err);
   }
 
+  let engineEnabled = false;
+  try {
+    engineEnabled = await getEngineState();
+  } catch {
+    // biarkan default false (mati) kalau gagal baca -- lebih aman daripada
+    // diam-diam anggap "jalan" padahal statusnya tidak terbaca.
+  }
+
   const sortedSites = [...sites].sort(
     (a, b) => (PRIORITY_ORDER[a.priority] ?? 4) - (PRIORITY_ORDER[b.priority] ?? 4)
   );
@@ -95,10 +107,33 @@ export default async function DashboardPage() {
   return (
     <main className="min-h-screen bg-white px-6 py-12">
       <div className="mx-auto max-w-4xl">
-        <h1 className="text-2xl font-bold text-zinc-900">Dashboard Leads</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Data langsung dari spreadsheet — refresh halaman ini kapan saja untuk lihat angka terbaru.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-zinc-900">Dashboard Leads</h1>
+            <p className="mt-1 text-sm text-zinc-500">
+              Data langsung dari spreadsheet — refresh halaman ini kapan saja untuk lihat angka terbaru.
+            </p>
+            <p className="mt-1 text-xs text-zinc-400">
+              Engine: {engineEnabled ? (
+                <span className="font-medium text-green-600">Jalan</span>
+              ) : (
+                <span className="font-medium text-zinc-500">Berhenti</span>
+              )}{" "}
+              — scrape otomatis, follow-up WA &amp; email cuma aktif kalau engine jalan.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <a
+              href={BANK_DATA_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-full border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 hover:border-zinc-400"
+            >
+              🔗 Buka Bank Data
+            </a>
+            <EngineToggle initialEnabled={engineEnabled} />
+          </div>
+        </div>
 
         {loadError && (
           <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">

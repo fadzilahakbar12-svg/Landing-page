@@ -1,5 +1,6 @@
 import { fetchLeads, markLeadFollowedUp, setLeadWaMeta } from "@/lib/leads";
 import { isWhatsappNumber, sendBulkFollowUpWhatsapp } from "@/lib/notify";
+import { getEngineState } from "@/lib/engine";
 
 // WhatsApp-only pipeline -- split from email on purpose (see email-followup/route.js).
 // Cold WhatsApp outreach needs a much tighter volume cap than email to avoid
@@ -18,6 +19,11 @@ export async function GET(request) {
   // kosong. Baris sheet selalu bertambah berurutan sesuai waktu masuk, jadi
   // "ambil yang pending lalu potong 25" ini otomatis mendahulukan antrian
   // paling lama -- tidak perlu logic prioritas tambahan.
+  const engineEnabled = await getEngineState();
+  if (!engineEnabled) {
+    return Response.json({ ok: true, skipped: true, reason: "Engine sedang mati (belum diaktifkan dari dashboard)." });
+  }
+
   const MAX_PER_BATCH = 25;
   const leads = await fetchLeads();
   const pending = leads

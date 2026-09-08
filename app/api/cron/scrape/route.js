@@ -1,5 +1,6 @@
 import { fetchSites, updateSiteStats } from "@/lib/sites";
 import { scanSite } from "@/lib/scraper";
+import { getEngineState } from "@/lib/engine";
 
 // 1 invocation = scan 1 situs saja (bukan seluruh watchlist sekaligus) --
 // dijadwalkan jalan berkali-kali sepanjang jam kerja (lihat vercel.json),
@@ -30,6 +31,15 @@ export async function GET(request) {
   const auth = request.headers.get("authorization");
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Jadwal cron ini tetap jalan seperti biasa terlepas dari status engine --
+  // yang membedakan cuma apakah tick ini benar-benar ngerjain sesuatu atau
+  // no-op. Ini yang membuat tombol "Mulai/Stop" di dashboard bisa instan
+  // (cuma toggle 1 flag), bukan harus daftar/hapus jadwal cron sungguhan.
+  const engineEnabled = await getEngineState();
+  if (!engineEnabled) {
+    return Response.json({ ok: true, skipped: true, reason: "Engine sedang mati (belum diaktifkan dari dashboard)." });
   }
 
   const sites = await fetchSites();
