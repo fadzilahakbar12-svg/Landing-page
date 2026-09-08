@@ -1,3 +1,4 @@
+import Link from "next/link";
 import LeadForm from "./LeadForm";
 
 export default function Home() {
@@ -7,6 +8,12 @@ export default function Home() {
       <p className="text-sm font-semibold uppercase tracking-wide text-blue-600">
         Landing Page
       </p>
+      <Link
+        href="/cara-kerja"
+        className="mt-2 text-sm text-zinc-500 underline decoration-zinc-300 underline-offset-4 hover:text-blue-600"
+      >
+        Lihat cara kerja di balik layar →
+      </Link>
       <h1 className="mt-4 max-w-2xl text-4xl font-bold text-zinc-900 sm:text-5xl">
         Judul Utama Kamu di Sini
       </h1>

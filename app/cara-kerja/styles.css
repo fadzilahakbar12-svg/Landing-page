@@ -1,0 +1,295 @@
+/* Halaman "Cara Kerja" -- semua token & selector di-scope di bawah .wf-flyer
+   supaya tema gelap halaman ini TIDAK bocor ke halaman lain di situs (home,
+   dashboard, dst yang pakai Tailwind + tema terang). */
+
+.wf-flyer {
+  --wf-bg: #0e1014;
+  --wf-panel: #171a21;
+  --wf-panel-2: #1d212a;
+  --wf-line: #2a2f3a;
+  --wf-ink: #eef1f6;
+  --wf-ink-dim: #98a1b2;
+  --wf-signal: #38d99b;
+  --wf-signal-dim: #1f5b47;
+  --wf-warm: #ff9d5c;
+
+  background: var(--wf-bg);
+  color: var(--wf-ink);
+  font-family: var(--font-body), "Segoe UI", system-ui, sans-serif;
+  line-height: 1.55;
+  position: relative;
+  min-height: 100vh;
+  padding: 56px 24px 80px;
+}
+
+.wf-flyer *,
+.wf-flyer *::before,
+.wf-flyer *::after {
+  box-sizing: border-box;
+}
+
+.wf-flyer-inner {
+  max-width: 760px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+}
+
+/* ambient control-room texture */
+.wf-flyer::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at 15% 8%, rgba(56, 217, 155, 0.07), transparent 40%),
+    radial-gradient(circle at 85% 92%, rgba(255, 157, 92, 0.06), transparent 45%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.wf-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+  color: var(--wf-ink-dim);
+  text-decoration: none;
+  margin-bottom: 36px;
+  border: 1px solid var(--wf-line);
+  border-radius: 100px;
+  padding: 7px 14px 7px 10px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.wf-back:hover {
+  color: var(--wf-signal);
+  border-color: var(--wf-signal-dim);
+}
+
+/* ---------- Hero ---------- */
+.wf-hero {
+  margin-bottom: 64px;
+}
+
+.wf-eyebrow {
+  font-family: var(--font-mono), monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--wf-signal);
+  margin: 0 0 18px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.wf-eyebrow::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--wf-signal);
+  box-shadow: 0 0 0 3px var(--wf-signal-dim);
+  flex: none;
+}
+
+.wf-flyer h1 {
+  font-family: var(--font-display), Georgia, "Times New Roman", serif;
+  font-weight: 600;
+  font-size: clamp(34px, 6.4vw, 54px);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  margin: 0 0 20px;
+  text-wrap: balance;
+  color: var(--wf-ink);
+}
+.wf-flyer h1 em {
+  font-style: italic;
+  font-weight: 500;
+  color: var(--wf-warm);
+}
+
+.wf-lede {
+  font-size: 16.5px;
+  color: var(--wf-ink-dim);
+  max-width: 56ch;
+  margin: 0 0 28px;
+}
+
+.wf-recap {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.wf-recap li {
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+  color: var(--wf-ink);
+  background: var(--wf-panel);
+  border: 1px solid var(--wf-line);
+  border-radius: 100px;
+  padding: 7px 14px;
+  white-space: nowrap;
+}
+
+/* ---------- Pipeline ---------- */
+.wf-pipeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.wf-stop {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  column-gap: 20px;
+}
+
+.wf-stop-spine {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.wf-stop-marker {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--wf-panel);
+  border: 1px solid var(--wf-line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.wf-stop-marker svg {
+  width: 26px;
+  height: 26px;
+  stroke: var(--wf-warm);
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.wf-stop-connector {
+  width: 2px;
+  flex: 1;
+  min-height: 38px;
+  margin: 6px 0 2px;
+  background-image: repeating-linear-gradient(to bottom, var(--wf-signal) 0 6px, transparent 6px 15px);
+  background-size: 2px 30px;
+  animation: wf-flow 1s linear infinite;
+}
+.wf-stop:last-child .wf-stop-connector {
+  display: none;
+}
+
+@keyframes wf-flow {
+  to {
+    background-position: 0 30px;
+  }
+}
+
+.wf-stop-card {
+  padding-bottom: 40px;
+}
+
+.wf-stop-num {
+  display: block;
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+  color: var(--wf-warm);
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+}
+
+.wf-stop-card h2 {
+  font-family: var(--font-display), Georgia, serif;
+  font-weight: 600;
+  font-size: 22px;
+  margin: 0 0 10px;
+  color: var(--wf-ink);
+  text-wrap: balance;
+}
+
+.wf-stop-card p {
+  margin: 0 0 14px;
+  font-size: 15px;
+  color: var(--wf-ink-dim);
+  max-width: 60ch;
+}
+
+.wf-tech {
+  font-family: var(--font-mono), monospace !important;
+  font-size: 11.5px !important;
+  color: var(--wf-signal) !important;
+  letter-spacing: 0.02em;
+  background: var(--wf-panel-2);
+  border: 1px solid var(--wf-line);
+  border-left: 2px solid var(--wf-signal);
+  display: inline-block;
+  padding: 6px 10px 6px 9px;
+  border-radius: 4px;
+  max-width: 100%;
+}
+.wf-tech::before {
+  content: "// ";
+  color: var(--wf-ink-dim);
+}
+
+/* ---------- Closing ---------- */
+.wf-closing {
+  margin-top: 8px;
+  padding: 26px 24px;
+  background: var(--wf-panel);
+  border: 1px solid var(--wf-line);
+  border-radius: 14px;
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.wf-closing svg {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  stroke: var(--wf-signal);
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  margin-top: 2px;
+}
+.wf-closing p {
+  margin: 0;
+  font-size: 14.5px;
+  color: var(--wf-ink-dim);
+  max-width: 58ch;
+}
+.wf-closing strong {
+  color: var(--wf-ink);
+  font-weight: 600;
+}
+
+@media (max-width: 520px) {
+  .wf-stop {
+    grid-template-columns: 48px 1fr;
+    column-gap: 14px;
+  }
+  .wf-stop-marker {
+    width: 44px;
+    height: 44px;
+  }
+  .wf-stop-marker svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wf-stop-connector {
+    animation: none;
+  }
+}
