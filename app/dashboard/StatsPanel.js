@@ -142,7 +142,7 @@ export default function StatsPanel({ leads }) {
               <span className="l">terhubung</span>
             </span>
           </div>
-          <p className="db-funnel-caption">WA {d.waStage.sent} + Email {d.emailStage.sent}</p>
+          <p className="db-funnel-caption">WA {d.waStage.sent} terkirim</p>
           <div className="db-funnel-stage">
             <span className="db-funnel-stage-label">Terkirim</span>
             <span className="db-funnel-stage-track"><span className="db-funnel-stage-fill" style={{ width: "100%" }} /></span>
@@ -168,7 +168,7 @@ export default function StatsPanel({ leads }) {
               <span className="l">klik CTA</span>
             </span>
           </div>
-          <p className="db-funnel-caption">WA {d.waStage.sent} + Email {d.emailStage.sent}</p>
+          <p className="db-funnel-caption">Email {d.emailStage.sent} terkirim</p>
           <div className="db-funnel-stage">
             <span className="db-funnel-stage-label">Terkirim</span>
             <span className="db-funnel-stage-track"><span className="db-funnel-stage-fill" style={{ width: "100%" }} /></span>
