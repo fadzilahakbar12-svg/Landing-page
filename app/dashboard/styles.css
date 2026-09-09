@@ -171,6 +171,7 @@
   margin: 0;
   font-variant-numeric: tabular-nums;
 }
+.db-tile-value .db-delta { margin-left: 8px; }
 .db-tile-sub {
   font-family: var(--font-mono), monospace;
   font-size: 10.5px;
@@ -211,58 +212,81 @@
   color: var(--db-ink-dim);
 }
 
-/* ---------- Perbandingan (day/week/month) ---------- */
-.db-compare-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
-  margin-bottom: 32px;
-}
-.db-compare-card {
-  background: var(--db-panel);
-  border: 1px solid var(--db-line);
-  border-radius: 12px;
-  padding: 16px 18px;
-}
-.db-compare-label {
-  font-family: var(--font-mono), monospace;
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--db-ink-dim);
-  margin: 0 0 12px;
-}
-.db-compare-row {
+/* ---------- Toolbar: rentang waktu + pembanding (persis mockup) ---------- */
+.db-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 0;
+  gap: 12px;
+  margin: 4px 0 22px;
 }
-.db-compare-row + .db-compare-row {
-  border-top: 1px solid var(--db-line);
+.db-range-group {
+  display: inline-flex;
+  background: var(--db-panel);
+  border: 1px solid var(--db-line);
+  border-radius: 100px;
+  padding: 3px;
+  gap: 2px;
 }
-.db-compare-metric {
-  font-size: 13px;
-  color: var(--db-ink);
-}
-.db-compare-badge {
+.db-range-group button {
   font-family: var(--font-mono), monospace;
-  font-size: 12.5px;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-}
-.db-compare-badge.is-up { color: var(--db-signal); }
-.db-compare-badge.is-down { color: var(--db-warm); }
-.db-compare-badge.is-flat { color: var(--db-ink-dim); }
-.db-compare-badge.is-none {
+  font-size: 12px;
   color: var(--db-ink-dim);
-  font-size: 10.5px;
-  font-style: italic;
+  background: transparent;
+  border: none;
+  border-radius: 100px;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.db-range-group button.is-active {
+  background: var(--db-signal);
+  color: #04140e;
+  font-weight: 600;
+}
+.db-range-group button:not(.is-active):hover { color: var(--db-ink); }
+
+.db-compare-select {
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+  color: var(--db-ink);
+  background: var(--db-panel);
+  border: 1px solid var(--db-line);
+  border-radius: 100px;
+  padding: 8px 28px 8px 14px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2398a1b2' stroke-width='1.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+.db-compare-select:focus { outline: none; border-color: var(--db-signal); }
+
+.db-compare-hint {
+  margin: -14px 0 26px;
+  font-family: var(--font-mono), monospace;
+  color: var(--db-ink-dim);
+  font-size: 11px;
+  text-align: right;
 }
 
-@media (max-width: 720px) {
-  .db-compare-grid { grid-template-columns: 1fr; }
+/* delta badge -- dipakai inline di tile-value & funnel-conv */
+.db-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 7px 2px 6px;
+  border-radius: 100px;
+  vertical-align: middle;
 }
+.db-delta.is-up { color: #7be3ab; background: rgba(56, 217, 155, 0.12); }
+.db-delta.is-down { color: #ff9d94; background: rgba(255, 122, 110, 0.12); }
+.db-delta.is-flat { color: var(--db-ink-dim); background: var(--db-panel-2); }
 
 /* ---------- Funnel per sumber (WA vs Email) ---------- */
 .db-funnel-grid {
@@ -309,6 +333,7 @@
   color: var(--fc);
   font-variant-numeric: tabular-nums;
 }
+.db-funnel-conv .n .db-delta { margin-left: 6px; }
 .db-funnel-conv .l {
   display: block;
   font-family: var(--font-mono), monospace;

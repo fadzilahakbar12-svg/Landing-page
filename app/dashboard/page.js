@@ -2,10 +2,10 @@ import { Fraunces, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import { fetchLeads } from "@/lib/leads";
 import { fetchSites } from "@/lib/sites";
 import { getEngineState } from "@/lib/engine";
-import { fetchStatsHistory } from "@/lib/statsHistory";
-import { computeWaCounts, waFunnel, emailFunnel } from "@/lib/metrics";
+import { computeWaCounts, waFunnel, emailFunnel, leadsInWindow, computeDelta } from "@/lib/metrics";
 import AddSiteForm from "./AddSiteForm";
 import EngineToggle from "./EngineToggle";
+import StatsPanel from "./StatsPanel";
 import "./styles.css";
 
 const fraunces = Fraunces({
@@ -63,42 +63,45 @@ function formatRelative(dateValue) {
   return `${Math.floor(hours / 24)} hari lalu`;
 }
 
-// Cari snapshot StatsHistory dengan tanggal PALING DEKAT tapi tidak lewat
-// targetDate -- bukan harus PERSIS tanggal itu, supaya tetap bisa hitung
-// perbandingan meski ada hari yang kelewat kecatat (mis. sebelum fitur ini
-// ada, atau redeploy sempat gagal semalam).
-function findSnapshotOnOrBefore(history, targetDate) {
-  const targetStr = targetDate.toISOString().slice(0, 10);
-  let best = null;
-  for (const row of history) {
-    if (String(row.date).slice(0, 10) <= targetStr) {
-      if (!best || String(row.date) > String(best.date)) best = row;
-    }
-  }
-  return best;
-}
-
-function daysAgo(n) {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() - n);
-  return d;
-}
-
-// delta > 0: naik (hijau, ▲). delta < 0: turun (warm, ▼). null: belum ada
-// data pembanding sama sekali (baris pertama sejak fitur ini dipasang).
-function delta(current, past) {
-  if (past === null || past === undefined) return null;
-  return current - past;
-}
-
 function pct(numerator, denominator) {
   if (!denominator) return "0%";
   return `${((numerator / denominator) * 100).toFixed(1)}%`;
 }
 
-function barWidth(numerator, denominator) {
-  if (!denominator) return "0%";
-  return `${Math.min(100, Math.round((numerator / denominator) * 100))}%`;
+// 1 "cohort" = lead yang MASUK dalam jendela waktu tsb (by timestamp), lalu
+// status WA/email-nya diambil dari kondisi TERKINI (bukan snapshot di masa
+// itu -- data historis per-event tidak tersimpan). Delta dihitung terhadap
+// jendela sebelumnya yang sama panjangnya (mis. 7 hari ini vs 7 hari sebelum itu).
+function buildRangeStat(leads, days, sub) {
+  const period = leadsInWindow(leads, days, 0);
+  const prev = leadsInWindow(leads, days, days);
+
+  const pCounts = computeWaCounts(period);
+  const pWa = waFunnel(pCounts);
+  const pEmail = emailFunnel(period);
+  const pSent = pWa.sent + pEmail.sent;
+
+  const qCounts = computeWaCounts(prev);
+  const qWa = waFunnel(qCounts);
+  const qEmail = emailFunnel(prev);
+  const qSent = qWa.sent + qEmail.sent;
+
+  return {
+    sub: sub(period.length),
+    total: { value: period.length, delta: computeDelta(period.length, prev.length) },
+    sent: { value: pSent, delta: computeDelta(pSent, qSent) },
+    read: { value: pWa.read, delta: computeDelta(pWa.read, qWa.read) },
+    connected: { value: pWa.connected, delta: computeDelta(pWa.connected, qWa.connected) },
+    fail: { value: pCounts.fail, delta: computeDelta(pCounts.fail, qCounts.fail) },
+    readPct: pct(pWa.read, pWa.sent),
+    connectedPct: pct(pWa.connected, pWa.sent),
+    waConvPct: pct(pWa.connected, pWa.sent),
+    waConvDelta: computeDelta(pWa.sent ? Math.round((pWa.connected / pWa.sent) * 100) : 0, qWa.sent ? Math.round((qWa.connected / qWa.sent) * 100) : 0),
+    emailConvPct: pct(pEmail.clicked, pEmail.sent),
+    emailConvDelta: computeDelta(pEmail.sent ? Math.round((pEmail.clicked / pEmail.sent) * 100) : 0, qEmail.sent ? Math.round((qEmail.clicked / qEmail.sent) * 100) : 0),
+    waStage: pWa,
+    emailStage: pEmail,
+  };
 }
 
 export default async function DashboardPage() {
@@ -127,37 +130,15 @@ export default async function DashboardPage() {
     // diam-diam anggap "jalan" padahal statusnya tidak terbaca.
   }
 
-  let statsHistory = [];
-  try {
-    statsHistory = await fetchStatsHistory();
-  } catch {
-    // belum ada tab StatsHistory / gagal baca -- kartu perbandingan cukup
-    // tampil "belum ada data", tidak perlu menggagalkan seluruh dashboard.
-  }
-
   const sortedSites = [...sites].sort(
     (a, b) => (PRIORITY_ORDER[a.priority] ?? 4) - (PRIORITY_ORDER[b.priority] ?? 4)
   );
 
-  const total = leads.length;
-  const counts = computeWaCounts(leads);
-  const wa = waFunnel(counts);
-  const email = emailFunnel(leads);
-  const combinedSent = wa.sent + email.sent; // gabungan 2 channel (WA + Email), bukan cuma WA
-
-  const compareWindows = [
-    { key: "day", label: "Hari ke Hari", days: 1 },
-    { key: "week", label: "Minggu ke Minggu", days: 7 },
-    { key: "month", label: "Bulan ke Bulan", days: 30 },
-  ].map(({ key, label, days }) => {
-    const snapshot = findSnapshotOnOrBefore(statsHistory, daysAgo(days));
-    return {
-      key,
-      label,
-      totalDelta: snapshot ? delta(total, snapshot.totalLeads) : null,
-      sentDelta: snapshot ? delta(combinedSent, snapshot.waSent + snapshot.emailSent) : null,
-    };
-  });
+  const rangeData = {
+    today: buildRangeStat(leads, 1, (n) => `+${n} hari ini`),
+    "7d": buildRangeStat(leads, 7, (n) => `+${n} minggu ini`),
+    "30d": buildRangeStat(leads, 30, (n) => `+${n} bulan ini`),
+  };
 
   return (
     <main className={`db-panel ${fraunces.variable} ${plexSans.variable} ${plexMono.variable}`}>
@@ -182,123 +163,7 @@ export default async function DashboardPage() {
 
         {loadError && <div className="db-error">Gagal memuat data: {loadError}</div>}
 
-        <div className="db-stats">
-          <div className="db-tile is-total">
-            <p className="db-tile-label">Total Leads</p>
-            <p className="db-tile-value">{total}</p>
-          </div>
-          <div className="db-tile c-sent">
-            <p className="db-tile-label">Terkirim</p>
-            <p className="db-tile-value">{combinedSent}</p>
-          </div>
-          <div className="db-tile c-read">
-            <p className="db-tile-label">Dibaca</p>
-            <p className="db-tile-value">{wa.read}</p>
-            <p className="db-tile-sub">{pct(wa.read, wa.sent)} dari terkirim</p>
-          </div>
-          <div className="db-tile c-connected">
-            <p className="db-tile-label">Terhubung</p>
-            <p className="db-tile-value">{wa.connected}</p>
-            <p className="db-tile-sub">{pct(wa.connected, wa.sent)} dari terkirim</p>
-          </div>
-          <div className="db-tile c-fail">
-            <p className="db-tile-label">Gagal</p>
-            <p className="db-tile-value">{counts.fail}</p>
-            <p className="db-tile-sub">nomor tidak valid</p>
-          </div>
-        </div>
-
-        <div className="db-section-head">
-          <h2>Perbandingan</h2>
-          <span className="db-hint">Total Leads &amp; Terkirim</span>
-        </div>
-
-        <div className="db-compare-grid">
-          {compareWindows.map((w) => (
-            <div className="db-compare-card" key={w.key}>
-              <p className="db-compare-label">{w.label}</p>
-              <div className="db-compare-row">
-                <span className="db-compare-metric">Total Leads</span>
-                {w.totalDelta === null ? (
-                  <span className="db-compare-badge is-none">belum ada data</span>
-                ) : (
-                  <span className={`db-compare-badge ${w.totalDelta > 0 ? "is-up" : w.totalDelta < 0 ? "is-down" : "is-flat"}`}>
-                    {w.totalDelta > 0 ? "▲" : w.totalDelta < 0 ? "▼" : "—"} {Math.abs(w.totalDelta)}
-                  </span>
-                )}
-              </div>
-              <div className="db-compare-row">
-                <span className="db-compare-metric">Terkirim</span>
-                {w.sentDelta === null ? (
-                  <span className="db-compare-badge is-none">belum ada data</span>
-                ) : (
-                  <span className={`db-compare-badge ${w.sentDelta > 0 ? "is-up" : w.sentDelta < 0 ? "is-down" : "is-flat"}`}>
-                    {w.sentDelta > 0 ? "▲" : w.sentDelta < 0 ? "▼" : "—"} {Math.abs(w.sentDelta)}
-                  </span>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="db-section-head">
-          <h2>Funnel per Sumber</h2>
-          <span className="db-hint">WhatsApp vs Email</span>
-        </div>
-
-        <div className="db-funnel-grid">
-          <div className="db-funnel-card wa">
-            <div className="db-funnel-head">
-              <span className="db-funnel-title">WhatsApp</span>
-              <span className="db-funnel-conv">
-                <span className="n">{pct(wa.connected, wa.sent)}</span>
-                <span className="l">terhubung</span>
-              </span>
-            </div>
-            <p className="db-funnel-caption">WA {wa.sent} + Email {email.sent}</p>
-            <div className="db-funnel-stage">
-              <span className="db-funnel-stage-label">Terkirim</span>
-              <span className="db-funnel-stage-track"><span className="db-funnel-stage-fill" style={{ width: "100%" }} /></span>
-              <span className="db-funnel-stage-num">{wa.sent}</span>
-            </div>
-            <div className="db-funnel-stage">
-              <span className="db-funnel-stage-label">Dibaca</span>
-              <span className="db-funnel-stage-track"><span className="db-funnel-stage-fill" style={{ width: barWidth(wa.read, wa.sent) }} /></span>
-              <span className="db-funnel-stage-num">{wa.read} <small>{pct(wa.read, wa.sent)}</small></span>
-            </div>
-            <div className="db-funnel-stage">
-              <span className="db-funnel-stage-label">Terhubung</span>
-              <span className="db-funnel-stage-track"><span className="db-funnel-stage-fill" style={{ width: barWidth(wa.connected, wa.sent) }} /></span>
-              <span className="db-funnel-stage-num">{wa.connected} <small>{pct(wa.connected, wa.sent)}</small></span>
-            </div>
-          </div>
-
-          <div className="db-funnel-card email">
-            <div className="db-funnel-head">
-              <span className="db-funnel-title">Email</span>
-              <span className="db-funnel-conv">
-                <span className="n">{pct(email.clicked, email.sent)}</span>
-                <span className="l">klik CTA</span>
-              </span>
-            </div>
-            <p className="db-funnel-caption">WA {wa.sent} + Email {email.sent}</p>
-            <div className="db-funnel-stage">
-              <span className="db-funnel-stage-label">Terkirim</span>
-              <span className="db-funnel-stage-track"><span className="db-funnel-stage-fill" style={{ width: "100%" }} /></span>
-              <span className="db-funnel-stage-num">{email.sent}</span>
-            </div>
-            <div className="db-funnel-stage">
-              <span className="db-funnel-stage-label">Dibuka</span>
-              <span className="db-funnel-stage-track"><span className="db-funnel-stage-fill" style={{ width: barWidth(email.opened, email.sent) }} /></span>
-              <span className="db-funnel-stage-num">{email.opened} <small>{pct(email.opened, email.sent)}</small></span>
-            </div>
-            <div className="db-funnel-stage">
-              <span className="db-funnel-stage-label">Klik CTA</span>
-              <span className="db-funnel-stage-track"><span className="db-funnel-stage-fill" style={{ width: barWidth(email.clicked, email.sent) }} /></span>
-              <span className="db-funnel-stage-num">{email.clicked} <small>{pct(email.clicked, email.sent)}</small></span>
-            </div>
-          </div>
-        </div>
+        <StatsPanel rangeData={rangeData} />
 
         <div className="db-section-head">
           <h2>Performa Situs</h2>
