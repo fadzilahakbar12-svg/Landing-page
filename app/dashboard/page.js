@@ -137,6 +137,7 @@ export default async function DashboardPage() {
   const counts = computeCounts(leads);
   const wa = waFunnel(counts);
   const email = emailFunnel(leads);
+  const combinedSent = wa.sent + email.sent; // gabungan 2 channel (WA + Email), bukan cuma WA
 
   return (
     <main className={`db-panel ${fraunces.variable} ${plexSans.variable} ${plexMono.variable}`}>
@@ -167,9 +168,9 @@ export default async function DashboardPage() {
             <p className="db-tile-value">{total}</p>
           </div>
           <div className="db-tile c-sent">
-            <p className="db-tile-label">WA Terkirim</p>
-            <p className="db-tile-value">{wa.sent}</p>
-            <p className="db-tile-sub">{pct(wa.sent, total)} dari total</p>
+            <p className="db-tile-label">Terkirim</p>
+            <p className="db-tile-value">{combinedSent}</p>
+            <p className="db-tile-sub">WA {wa.sent} + Email {email.sent}</p>
           </div>
           <div className="db-tile c-read">
             <p className="db-tile-label">WA Dibaca</p>
@@ -180,11 +181,6 @@ export default async function DashboardPage() {
             <p className="db-tile-label">WA Terhubung</p>
             <p className="db-tile-value">{wa.connected}</p>
             <p className="db-tile-sub">{pct(wa.connected, wa.sent)} dari terkirim</p>
-          </div>
-          <div className="db-tile c-manual">
-            <p className="db-tile-label">Ditangani Manual</p>
-            <p className="db-tile-value">{counts.manual}</p>
-            <p className="db-tile-sub">{pct(counts.manual, total)} dari total</p>
           </div>
           <div className="db-tile c-fail">
             <p className="db-tile-label">WA Gagal</p>
