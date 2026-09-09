@@ -231,7 +231,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 4px;
+}
+.db-funnel-caption {
+  font-family: var(--font-mono), monospace;
+  font-size: 10.5px;
+  color: var(--db-ink-dim);
+  margin: 0 0 16px;
 }
 .db-funnel-title {
   font-family: var(--font-display), Georgia, serif;

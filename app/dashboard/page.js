@@ -170,20 +170,19 @@ export default async function DashboardPage() {
           <div className="db-tile c-sent">
             <p className="db-tile-label">Terkirim</p>
             <p className="db-tile-value">{combinedSent}</p>
-            <p className="db-tile-sub">WA {wa.sent} + Email {email.sent}</p>
           </div>
           <div className="db-tile c-read">
-            <p className="db-tile-label">WA Dibaca</p>
+            <p className="db-tile-label">Dibaca</p>
             <p className="db-tile-value">{wa.read}</p>
             <p className="db-tile-sub">{pct(wa.read, wa.sent)} dari terkirim</p>
           </div>
           <div className="db-tile c-connected">
-            <p className="db-tile-label">WA Terhubung</p>
+            <p className="db-tile-label">Terhubung</p>
             <p className="db-tile-value">{wa.connected}</p>
             <p className="db-tile-sub">{pct(wa.connected, wa.sent)} dari terkirim</p>
           </div>
           <div className="db-tile c-fail">
-            <p className="db-tile-label">WA Gagal</p>
+            <p className="db-tile-label">Gagal</p>
             <p className="db-tile-value">{counts.fail}</p>
             <p className="db-tile-sub">nomor tidak valid</p>
           </div>
@@ -203,6 +202,7 @@ export default async function DashboardPage() {
                 <span className="l">terhubung</span>
               </span>
             </div>
+            <p className="db-funnel-caption">WA {wa.sent} + Email {email.sent}</p>
             <div className="db-funnel-stage">
               <span className="db-funnel-stage-label">Terkirim</span>
               <span className="db-funnel-stage-track"><span className="db-funnel-stage-fill" style={{ width: "100%" }} /></span>
@@ -228,6 +228,7 @@ export default async function DashboardPage() {
                 <span className="l">klik CTA</span>
               </span>
             </div>
+            <p className="db-funnel-caption">WA {wa.sent} + Email {email.sent}</p>
             <div className="db-funnel-stage">
               <span className="db-funnel-stage-label">Terkirim</span>
               <span className="db-funnel-stage-track"><span className="db-funnel-stage-fill" style={{ width: "100%" }} /></span>
