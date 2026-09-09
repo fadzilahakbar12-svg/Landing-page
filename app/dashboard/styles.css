@@ -46,10 +46,94 @@
   position: fixed;
   inset: 0;
   background:
-    radial-gradient(circle at 12% 6%, rgba(56, 217, 155, 0.06), transparent 38%),
-    radial-gradient(circle at 90% 90%, rgba(255, 157, 92, 0.05), transparent 42%);
+    radial-gradient(circle at 12% 6%, rgba(var(--db-glow-1), 0.06), transparent 38%),
+    radial-gradient(circle at 90% 90%, rgba(var(--db-glow-2), 0.05), transparent 42%);
   pointer-events: none;
   z-index: 0;
+  transition: background 0.5s ease;
+}
+
+/* ---------- Latar neon interaktif (ikut kursor) ---------- */
+/* Mode ON (default) -- hijau/biru, senada tema situs. Mode OFF (engine
+   berhenti) -- merah neon. Semua elemen glow & partikel mewarisi var ini
+   lewat cascade CSS biasa, tidak perlu attribute terpisah di tiap elemen. */
+.db-panel {
+  --db-glow-1: 56, 217, 155;
+  --db-glow-2: 91, 157, 255;
+  --db-glow-accent: var(--db-signal);
+  --db-glow-accent-dim: var(--db-signal-dim);
+}
+.db-panel[data-engine="off"] {
+  --db-glow-1: 255, 90, 90;
+  --db-glow-2: 255, 122, 110;
+  --db-glow-accent: #ff5a5a;
+  --db-glow-accent-dim: #5c2626;
+}
+
+.db-glow-root {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.db-glow-a,
+.db-glow-b {
+  position: fixed;
+  top: 0;
+  left: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  will-change: transform;
+}
+.db-glow-a {
+  width: 560px;
+  height: 560px;
+  margin-left: -280px;
+  margin-top: -280px;
+  background: radial-gradient(circle, rgba(var(--db-glow-1), 0.14) 0%, rgba(var(--db-glow-1), 0.04) 40%, transparent 70%);
+  transition: background 0.5s ease;
+}
+.db-glow-b {
+  width: 240px;
+  height: 240px;
+  margin-left: -120px;
+  margin-top: -120px;
+  background: radial-gradient(circle, rgba(var(--db-glow-2), 0.18) 0%, transparent 65%);
+  transition: background 0.5s ease;
+}
+.db-glow-dot {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 7px;
+  height: 7px;
+  margin-left: -3.5px;
+  margin-top: -3.5px;
+  border-radius: 50%;
+  background: var(--db-glow-accent);
+  box-shadow: 0 0 10px 2px var(--db-glow-accent);
+  pointer-events: none;
+  z-index: 100;
+  transition: background 0.4s ease, box-shadow 0.4s ease;
+}
+.db-glow-particle {
+  position: fixed;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--db-glow-accent);
+  pointer-events: none;
+  z-index: 1;
+  animation: db-particle-fade 900ms ease-out forwards;
+}
+@keyframes db-particle-fade {
+  0% { opacity: 0.75; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.2) translateY(-14px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .db-glow-root { display: none; }
 }
 
 /* ---------- Top bar ---------- */

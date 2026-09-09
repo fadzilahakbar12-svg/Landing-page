@@ -5,6 +5,7 @@ import { getEngineState } from "@/lib/engine";
 import AddSiteForm from "./AddSiteForm";
 import EngineToggle from "./EngineToggle";
 import StatsPanel from "./StatsPanel";
+import CursorGlow from "./CursorGlow";
 import "./styles.css";
 
 const fraunces = Fraunces({
@@ -103,7 +104,11 @@ export default async function DashboardPage() {
   }));
 
   return (
-    <main className={`db-panel ${fraunces.variable} ${plexSans.variable} ${plexMono.variable}`}>
+    <main
+      className={`db-panel ${fraunces.variable} ${plexSans.variable} ${plexMono.variable}`}
+      data-engine={engineEnabled ? "on" : "off"}
+    >
+      <CursorGlow />
       <div className="db-inner">
         <div className="db-topbar">
           <div className="db-brand">
