@@ -6,6 +6,8 @@ import AddSiteForm from "./AddSiteForm";
 import EngineToggle from "./EngineToggle";
 import StatsPanel from "./StatsPanel";
 import CursorGlow from "./CursorGlow";
+import EngineStatusText from "./EngineStatusText";
+import { EngineStateProvider } from "./EngineStateContext";
 import "./styles.css";
 
 const fraunces = Fraunces({
@@ -108,6 +110,7 @@ export default async function DashboardPage() {
       className={`db-panel ${fraunces.variable} ${plexSans.variable} ${plexMono.variable}`}
       data-engine={engineEnabled ? "on" : "off"}
     >
+      <EngineStateProvider initialEnabled={engineEnabled}>
       <CursorGlow />
       <div className="db-inner">
         <div className="db-topbar">
@@ -115,10 +118,7 @@ export default async function DashboardPage() {
             <p className="db-eyebrow">Kontrol Panel · Bank Data</p>
             <h1>Ringkasan Leads</h1>
             <p className="db-sub">Data langsung dari spreadsheet — refresh kapan saja untuk lihat angka terbaru.</p>
-            <p className="db-engine-line">
-              Engine: {engineEnabled ? <span className="on">Jalan</span> : <span className="off">Berhenti</span>}
-              {" "}— scrape otomatis, follow-up WA &amp; email cuma aktif kalau engine jalan.
-            </p>
+            <EngineStatusText initialEnabled={engineEnabled} />
           </div>
           <div className="db-actions">
             <a href={BANK_DATA_URL} target="_blank" rel="noopener noreferrer" className="db-btn-ghost">
@@ -180,6 +180,7 @@ export default async function DashboardPage() {
           </div>
         )}
       </div>
+      </EngineStateProvider>
     </main>
   );
 }

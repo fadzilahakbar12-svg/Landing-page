@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useEngineState } from "./EngineStateContext";
 
 // Jam & hari operasional: Senin-Jumat 09:00-18:00 WIB. Dipakai cuma untuk
 // warning konfirmasi di tombol ini (testing) -- TIDAK mengubah kapan cron
@@ -30,6 +31,7 @@ export default function EngineToggle({ initialEnabled }) {
   const router = useRouter();
   const [enabled, setEnabled] = useState(initialEnabled);
   const [loading, setLoading] = useState(false);
+  const shared = useEngineState(); // dipakai CursorGlow & teks status supaya berubah instan
 
   async function toggle() {
     const next = !enabled;
@@ -51,6 +53,7 @@ export default function EngineToggle({ initialEnabled }) {
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || "Gagal mengubah status engine.");
       setEnabled(data.enabled);
+      shared?.setEnabled(data.enabled); // instan -- tidak menunggu router.refresh()
       router.refresh();
     } catch (err) {
       alert(err.message);

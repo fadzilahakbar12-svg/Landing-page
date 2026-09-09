@@ -1,19 +1,27 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useEngineState } from "./EngineStateContext";
 
 // Latar neon interaktif yang mengikuti kursor. Warnanya (hijau/merah)
-// SEPENUHNYA diatur lewat CSS var yang di-scope pada [data-engine] di elemen
-// <main class="db-panel"> (lihat page.js) -- komponen ini sendiri tidak
-// tahu/peduli status engine, cuma menggambar & menggerakkan lapisan glow.
-// Sinkron otomatis dengan tombol Start/Stop Engine yang sudah ada lewat
-// router.refresh() (lihat EngineToggle.js). TIDAK ada kontrol baru di sini.
+// diatur lewat CSS var yang di-scope pada [data-engine] di elemen
+// <main class="db-panel">. Atribut itu di-set LANGSUNG lewat DOM (bukan
+// menunggu router.refresh() re-render dari server) begitu status engine
+// di context berubah -- supaya transisi warnanya instan persis saat tombol
+// Start/Stop Engine diklik, bukan baru berubah setelah round-trip server
+// selesai (itu tetap jalan di belakang layar untuk data lain).
 export default function CursorGlow() {
   const rootRef = useRef(null);
   const glowARef = useRef(null);
   const glowBRef = useRef(null);
   const dotRef = useRef(null);
   const posRef = useRef({ mx: 0, my: 0, bx: 0, by: 0 });
+  const engine = useEngineState();
+
+  useEffect(() => {
+    const panel = rootRef.current?.closest(".db-panel");
+    if (panel) panel.setAttribute("data-engine", engine?.enabled ? "on" : "off");
+  }, [engine?.enabled]);
 
   useEffect(() => {
     const pos = posRef.current;
