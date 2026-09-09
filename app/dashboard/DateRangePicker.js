@@ -39,10 +39,12 @@ function buildMonthGrid(viewYear, viewMonth) {
   });
 }
 
-// Popover kalender dark-themed untuk memilih rentang tanggal pembanding
-// (custom, menggantikan dropdown WoW/MoM lama). Klik pertama = mulai, klik
-// kedua = selesai; klik lagi sebelum "mulai" mereset pilihan.
-export default function DateRangePicker({ range, onChange }) {
+// Popover kalender dark-themed untuk memilih rentang tanggal CUSTOM --
+// begitu diterapkan, ini JADI periode aktif yang ditampilkan (bukan cuma
+// pembanding di belakang layar), menggantikan pilihan pill Hari Ini/7
+// Hari/30 Hari. Klik pertama = mulai, klik kedua = selesai; klik lagi
+// sebelum "mulai" mereset pilihan.
+export default function DateRangePicker({ range, onChange, active }) {
   const [open, setOpen] = useState(false);
   const [viewDate, setViewDate] = useState(() => range.start || new Date());
   const [draftStart, setDraftStart] = useState(range.start);
@@ -89,8 +91,12 @@ export default function DateRangePicker({ range, onChange }) {
 
   return (
     <div className="db-daterange" ref={rootRef}>
-      <button type="button" className="db-daterange-trigger" onClick={openPopover}>
-        📅 {range.start && range.end ? `${formatShort(range.start)} – ${formatShort(range.end)}` : "Pilih rentang"}
+      <button
+        type="button"
+        className={`db-daterange-trigger${active ? " is-active" : ""}`}
+        onClick={openPopover}
+      >
+        📅 {range.start && range.end ? `${formatShort(range.start)} – ${formatShort(range.end)}` : "Custom"}
       </button>
 
       {open && (

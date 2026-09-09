@@ -1,13 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { leadsInWindow, leadsInRange, summarizeLeads, computeDelta } from "@/lib/metrics";
+import { leadsInRange, summarizeLeads, computeDelta, getCalendarPeriod } from "@/lib/metrics";
 import DateRangePicker from "./DateRangePicker";
 
 const RANGES = [
-  { key: "today", label: "Hari Ini", days: 1, sub: (n) => `+${n} hari ini` },
-  { key: "7d", label: "7 Hari", days: 7, sub: (n) => `+${n} minggu ini` },
-  { key: "30d", label: "30 Hari", days: 30, sub: (n) => `+${n} bulan ini` },
+  { key: "today", label: "Hari Ini" },
+  { key: "7d", label: "7 Hari" },
+  { key: "30d", label: "30 Hari" },
 ];
 
 function pct(numerator, denominator) {
@@ -20,6 +20,11 @@ function barWidth(numerator, denominator) {
   return `${Math.min(100, Math.round((numerator / denominator) * 100))}%`;
 }
 
+function formatShort(d) {
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+}
+
 // dir "new" = periode pembanding nol lead sama sekali (belum ada baseline)
 // -- tampilkan "Baru" daripada pembagian dengan nol.
 function DeltaBadge({ pct: p, dir }) {
@@ -28,39 +33,21 @@ function DeltaBadge({ pct: p, dir }) {
   return <span className={`db-delta is-${dir}`}>{arrow} {Math.abs(p)}%</span>;
 }
 
-// Default rentang pembanding: periode SEBELUMNYA yang sama panjangnya
-// dengan pill yang aktif -- dipakai sampai user memilih rentang custom
-// sendiri lewat kalender.
-function defaultCompareRange(days) {
-  const now = Date.now();
-  const end = new Date(now - days * 86400000);
-  const start = new Date(now - 2 * days * 86400000);
-  return { start, end };
-}
-
 export default function StatsPanel({ leads }) {
-  const [range, setRange] = useState("today");
-  const [compareRange, setCompareRange] = useState(() => defaultCompareRange(RANGES[0].days));
-  const [customized, setCustomized] = useState(false);
+  // mode "custom" aktif begitu user menerapkan pilihan di kalender --
+  // menggantikan pill manapun yang tadinya aktif (lihat DateRangePicker).
+  const [mode, setMode] = useState("today");
+  const [customRange, setCustomRange] = useState({ start: null, end: null });
 
-  const activeRange = RANGES.find((r) => r.key === range);
-
-  function handleRangeChange(key) {
-    setRange(key);
-    if (!customized) {
-      const meta = RANGES.find((r) => r.key === key);
-      setCompareRange(defaultCompareRange(meta.days));
-    }
-  }
-
-  function handleCompareChange(next) {
-    setCompareRange(next);
-    setCustomized(true);
+  function handleCustomApply(range) {
+    setCustomRange(range);
+    setMode("custom");
   }
 
   const stat = useMemo(() => {
-    const currentLeads = leadsInWindow(leads, activeRange.days, 0);
-    const compareLeads = leadsInRange(leads, compareRange.start, compareRange.end);
+    const period = getCalendarPeriod(mode, customRange);
+    const currentLeads = leadsInRange(leads, period.current.start, period.current.end);
+    const compareLeads = leadsInRange(leads, period.compare.start, period.compare.end);
     const current = summarizeLeads(currentLeads);
     const compare = summarizeLeads(compareLeads);
 
@@ -70,7 +57,8 @@ export default function StatsPanel({ leads }) {
     const emailConvPrev = compare.emailStage.sent ? Math.round((compare.emailStage.clicked / compare.emailStage.sent) * 100) : 0;
 
     return {
-      sub: activeRange.sub(current.total),
+      period,
+      sub: period.sub(current.total),
       total: { value: current.total, delta: computeDelta(current.total, compare.total) },
       sent: { value: current.sent, delta: computeDelta(current.sent, compare.sent) },
       read: { value: current.waStage.read, delta: computeDelta(current.waStage.read, compare.waStage.read) },
@@ -87,7 +75,7 @@ export default function StatsPanel({ leads }) {
       waStage: current.waStage,
       emailStage: current.emailStage,
     };
-  }, [leads, activeRange, compareRange]);
+  }, [leads, mode, customRange]);
 
   const d = stat;
 
@@ -98,15 +86,15 @@ export default function StatsPanel({ leads }) {
           {RANGES.map((r) => (
             <button
               key={r.key}
-              className={r.key === range ? "is-active" : ""}
-              onClick={() => handleRangeChange(r.key)}
+              className={r.key === mode ? "is-active" : ""}
+              onClick={() => setMode(r.key)}
               type="button"
             >
               {r.label}
             </button>
           ))}
         </div>
-        <DateRangePicker range={compareRange} onChange={handleCompareChange} />
+        <DateRangePicker range={customRange} onChange={handleCustomApply} active={mode === "custom"} />
       </div>
 
       <div className="db-stats">
@@ -136,7 +124,9 @@ export default function StatsPanel({ leads }) {
           <p className="db-tile-sub">{d.failOfTotalPct} dari total leads</p>
         </div>
       </div>
-      <p className="db-compare-hint">dibanding {compareRange.start && compareRange.end ? `${compareRange.start.toLocaleDateString("id-ID")} – ${compareRange.end.toLocaleDateString("id-ID")}` : "periode sebelumnya"}</p>
+      <p className="db-compare-hint">
+        {d.period.compareLabel} ({formatShort(d.period.compare.start)} – {formatShort(d.period.compare.end)})
+      </p>
 
       <div className="db-section-head">
         <h2>Funnel per Sumber</h2>

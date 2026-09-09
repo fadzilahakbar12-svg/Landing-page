@@ -262,6 +262,12 @@
   white-space: nowrap;
 }
 .db-daterange-trigger:hover { border-color: var(--db-signal-dim); color: var(--db-signal); }
+.db-daterange-trigger.is-active {
+  background: var(--db-signal);
+  border-color: var(--db-signal);
+  color: #04140e;
+  font-weight: 600;
+}
 
 .db-daterange-pop {
   position: absolute;
