@@ -2,7 +2,6 @@ import { Fraunces, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import { fetchLeads } from "@/lib/leads";
 import { fetchSites } from "@/lib/sites";
 import { getEngineState } from "@/lib/engine";
-import { computeWaCounts, waFunnel, emailFunnel, leadsInWindow, computeDelta } from "@/lib/metrics";
 import AddSiteForm from "./AddSiteForm";
 import EngineToggle from "./EngineToggle";
 import StatsPanel from "./StatsPanel";
@@ -63,47 +62,6 @@ function formatRelative(dateValue) {
   return `${Math.floor(hours / 24)} hari lalu`;
 }
 
-function pct(numerator, denominator) {
-  if (!denominator) return "0%";
-  return `${((numerator / denominator) * 100).toFixed(1)}%`;
-}
-
-// 1 "cohort" = lead yang MASUK dalam jendela waktu tsb (by timestamp), lalu
-// status WA/email-nya diambil dari kondisi TERKINI (bukan snapshot di masa
-// itu -- data historis per-event tidak tersimpan). Delta dihitung terhadap
-// jendela sebelumnya yang sama panjangnya (mis. 7 hari ini vs 7 hari sebelum itu).
-function buildRangeStat(leads, days, sub) {
-  const period = leadsInWindow(leads, days, 0);
-  const prev = leadsInWindow(leads, days, days);
-
-  const pCounts = computeWaCounts(period);
-  const pWa = waFunnel(pCounts);
-  const pEmail = emailFunnel(period);
-  const pSent = pWa.sent + pEmail.sent;
-
-  const qCounts = computeWaCounts(prev);
-  const qWa = waFunnel(qCounts);
-  const qEmail = emailFunnel(prev);
-  const qSent = qWa.sent + qEmail.sent;
-
-  return {
-    sub: sub(period.length),
-    total: { value: period.length, delta: computeDelta(period.length, prev.length) },
-    sent: { value: pSent, delta: computeDelta(pSent, qSent) },
-    read: { value: pWa.read, delta: computeDelta(pWa.read, qWa.read) },
-    connected: { value: pWa.connected, delta: computeDelta(pWa.connected, qWa.connected) },
-    fail: { value: pCounts.fail, delta: computeDelta(pCounts.fail, qCounts.fail) },
-    readPct: pct(pWa.read, pWa.sent),
-    connectedPct: pct(pWa.connected, pWa.sent),
-    waConvPct: pct(pWa.connected, pWa.sent),
-    waConvDelta: computeDelta(pWa.sent ? Math.round((pWa.connected / pWa.sent) * 100) : 0, qWa.sent ? Math.round((qWa.connected / qWa.sent) * 100) : 0),
-    emailConvPct: pct(pEmail.clicked, pEmail.sent),
-    emailConvDelta: computeDelta(pEmail.sent ? Math.round((pEmail.clicked / pEmail.sent) * 100) : 0, qEmail.sent ? Math.round((qEmail.clicked / qEmail.sent) * 100) : 0),
-    waStage: pWa,
-    emailStage: pEmail,
-  };
-}
-
 export default async function DashboardPage() {
   let leads = [];
   let loadError = null;
@@ -134,11 +92,15 @@ export default async function DashboardPage() {
     (a, b) => (PRIORITY_ORDER[a.priority] ?? 4) - (PRIORITY_ORDER[b.priority] ?? 4)
   );
 
-  const rangeData = {
-    today: buildRangeStat(leads, 1, (n) => `+${n} hari ini`),
-    "7d": buildRangeStat(leads, 7, (n) => `+${n} minggu ini`),
-    "30d": buildRangeStat(leads, 30, (n) => `+${n} bulan ini`),
-  };
+  // Cuma field yang benar-benar dibutuhkan StatsPanel untuk hitung ulang di
+  // client (rentang pill + kalender custom) -- nama/WA/email lead SENGAJA
+  // tidak ikut dikirim ke sana, tidak perlu bocor ke HTML halaman ini.
+  const statsLeads = leads.map((l) => ({
+    timestamp: l.timestamp,
+    waStatus: l.waStatus,
+    emailSentAt: l.emailSentAt,
+    emailStatus: l.emailStatus,
+  }));
 
   return (
     <main className={`db-panel ${fraunces.variable} ${plexSans.variable} ${plexMono.variable}`}>
@@ -163,7 +125,7 @@ export default async function DashboardPage() {
 
         {loadError && <div className="db-error">Gagal memuat data: {loadError}</div>}
 
-        <StatsPanel rangeData={rangeData} />
+        <StatsPanel leads={statsLeads} />
 
         <div className="db-section-head">
           <h2>Performa Situs</h2>

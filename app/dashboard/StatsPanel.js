@@ -1,32 +1,95 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { leadsInWindow, leadsInRange, summarizeLeads, computeDelta } from "@/lib/metrics";
+import DateRangePicker from "./DateRangePicker";
 
 const RANGES = [
-  { key: "today", label: "Hari Ini", title: "Ringkasan Hari Ini" },
-  { key: "7d", label: "7 Hari", title: "Ringkasan 7 Hari Terakhir" },
-  { key: "30d", label: "30 Hari", title: "Ringkasan 30 Hari Terakhir" },
+  { key: "today", label: "Hari Ini", days: 1, sub: (n) => `+${n} hari ini` },
+  { key: "7d", label: "7 Hari", days: 7, sub: (n) => `+${n} minggu ini` },
+  { key: "30d", label: "30 Hari", days: 30, sub: (n) => `+${n} bulan ini` },
 ];
 
-const COMPARE_LABEL = {
-  prev: "dibanding periode sebelumnya",
-  wow: "dibanding minggu lalu (WoW)",
-  mom: "dibanding bulan lalu (MoM)",
-};
-
-// Badge delta ▲/▼/Baru -- dir "new" dipakai kalau periode pembanding nol
-// (belum ada baseline sama sekali), supaya tidak menampilkan pembagian
-// dengan nol sebagai angka yang menyesatkan.
-function DeltaBadge({ pct, dir }) {
-  if (dir === "new") return <span className="db-delta is-flat">Baru</span>;
-  const arrow = dir === "up" ? "▲" : dir === "down" ? "▼" : "—";
-  return <span className={`db-delta is-${dir}`}>{arrow} {Math.abs(pct)}%</span>;
+function pct(numerator, denominator) {
+  if (!denominator) return "0%";
+  return `${((numerator / denominator) * 100).toFixed(1)}%`;
 }
 
-export default function StatsPanel({ rangeData }) {
+function barWidth(numerator, denominator) {
+  if (!denominator) return "0%";
+  return `${Math.min(100, Math.round((numerator / denominator) * 100))}%`;
+}
+
+// dir "new" = periode pembanding nol lead sama sekali (belum ada baseline)
+// -- tampilkan "Baru" daripada pembagian dengan nol.
+function DeltaBadge({ pct: p, dir }) {
+  if (dir === "new") return <span className="db-delta is-flat">Baru</span>;
+  const arrow = dir === "up" ? "▲" : dir === "down" ? "▼" : "—";
+  return <span className={`db-delta is-${dir}`}>{arrow} {Math.abs(p)}%</span>;
+}
+
+// Default rentang pembanding: periode SEBELUMNYA yang sama panjangnya
+// dengan pill yang aktif -- dipakai sampai user memilih rentang custom
+// sendiri lewat kalender.
+function defaultCompareRange(days) {
+  const now = Date.now();
+  const end = new Date(now - days * 86400000);
+  const start = new Date(now - 2 * days * 86400000);
+  return { start, end };
+}
+
+export default function StatsPanel({ leads }) {
   const [range, setRange] = useState("today");
-  const [compare, setCompare] = useState("prev");
-  const d = rangeData[range];
+  const [compareRange, setCompareRange] = useState(() => defaultCompareRange(RANGES[0].days));
+  const [customized, setCustomized] = useState(false);
+
+  const activeRange = RANGES.find((r) => r.key === range);
+
+  function handleRangeChange(key) {
+    setRange(key);
+    if (!customized) {
+      const meta = RANGES.find((r) => r.key === key);
+      setCompareRange(defaultCompareRange(meta.days));
+    }
+  }
+
+  function handleCompareChange(next) {
+    setCompareRange(next);
+    setCustomized(true);
+  }
+
+  const stat = useMemo(() => {
+    const currentLeads = leadsInWindow(leads, activeRange.days, 0);
+    const compareLeads = leadsInRange(leads, compareRange.start, compareRange.end);
+    const current = summarizeLeads(currentLeads);
+    const compare = summarizeLeads(compareLeads);
+
+    const waConvNow = current.waStage.sent ? Math.round((current.waStage.connected / current.waStage.sent) * 100) : 0;
+    const waConvPrev = compare.waStage.sent ? Math.round((compare.waStage.connected / compare.waStage.sent) * 100) : 0;
+    const emailConvNow = current.emailStage.sent ? Math.round((current.emailStage.clicked / current.emailStage.sent) * 100) : 0;
+    const emailConvPrev = compare.emailStage.sent ? Math.round((compare.emailStage.clicked / compare.emailStage.sent) * 100) : 0;
+
+    return {
+      sub: activeRange.sub(current.total),
+      total: { value: current.total, delta: computeDelta(current.total, compare.total) },
+      sent: { value: current.sent, delta: computeDelta(current.sent, compare.sent) },
+      read: { value: current.waStage.read, delta: computeDelta(current.waStage.read, compare.waStage.read) },
+      connected: { value: current.waStage.connected, delta: computeDelta(current.waStage.connected, compare.waStage.connected) },
+      fail: { value: current.fail, delta: computeDelta(current.fail, compare.fail) },
+      sentOfTotalPct: pct(current.sent, current.total),
+      failOfTotalPct: pct(current.fail, current.total),
+      readPct: pct(current.waStage.read, current.waStage.sent),
+      connectedPct: pct(current.waStage.connected, current.waStage.sent),
+      waConvPct: pct(current.waStage.connected, current.waStage.sent),
+      waConvDelta: computeDelta(waConvNow, waConvPrev),
+      emailConvPct: pct(current.emailStage.clicked, current.emailStage.sent),
+      emailConvDelta: computeDelta(emailConvNow, emailConvPrev),
+      waStage: current.waStage,
+      emailStage: current.emailStage,
+    };
+  }, [leads, activeRange, compareRange]);
+
+  const d = stat;
 
   return (
     <>
@@ -36,22 +99,14 @@ export default function StatsPanel({ rangeData }) {
             <button
               key={r.key}
               className={r.key === range ? "is-active" : ""}
-              onClick={() => setRange(r.key)}
+              onClick={() => handleRangeChange(r.key)}
               type="button"
             >
               {r.label}
             </button>
           ))}
         </div>
-        <select
-          className="db-compare-select"
-          value={compare}
-          onChange={(e) => setCompare(e.target.value)}
-        >
-          <option value="prev">Dibanding periode sebelumnya</option>
-          <option value="wow">Dibanding minggu lalu (WoW)</option>
-          <option value="mom">Dibanding bulan lalu (MoM)</option>
-        </select>
+        <DateRangePicker range={compareRange} onChange={handleCompareChange} />
       </div>
 
       <div className="db-stats">
@@ -63,7 +118,7 @@ export default function StatsPanel({ rangeData }) {
         <div className="db-tile c-sent">
           <p className="db-tile-label">Terkirim</p>
           <p className="db-tile-value">{d.sent.value} <DeltaBadge pct={d.sent.delta.pct} dir={d.sent.delta.dir} /></p>
-          <p className="db-tile-sub">WA {d.waStage.sent} + Email {d.emailStage.sent}</p>
+          <p className="db-tile-sub">{d.sentOfTotalPct} dari total leads</p>
         </div>
         <div className="db-tile c-read">
           <p className="db-tile-label">Dibaca</p>
@@ -78,10 +133,10 @@ export default function StatsPanel({ rangeData }) {
         <div className="db-tile c-fail">
           <p className="db-tile-label">Gagal</p>
           <p className="db-tile-value">{d.fail.value} <DeltaBadge pct={d.fail.delta.pct} dir={d.fail.delta.dir} /></p>
-          <p className="db-tile-sub">nomor tidak valid</p>
+          <p className="db-tile-sub">{d.failOfTotalPct} dari total leads</p>
         </div>
       </div>
-      <p className="db-compare-hint">{COMPARE_LABEL[compare]}</p>
+      <p className="db-compare-hint">dibanding {compareRange.start && compareRange.end ? `${compareRange.start.toLocaleDateString("id-ID")} – ${compareRange.end.toLocaleDateString("id-ID")}` : "periode sebelumnya"}</p>
 
       <div className="db-section-head">
         <h2>Funnel per Sumber</h2>
@@ -143,14 +198,4 @@ export default function StatsPanel({ rangeData }) {
       </div>
     </>
   );
-}
-
-function pct(numerator, denominator) {
-  if (!denominator) return "0%";
-  return `${((numerator / denominator) * 100).toFixed(1)}%`;
-}
-
-function barWidth(numerator, denominator) {
-  if (!denominator) return "0%";
-  return `${Math.min(100, Math.round((numerator / denominator) * 100))}%`;
 }

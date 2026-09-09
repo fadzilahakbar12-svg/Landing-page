@@ -247,22 +247,121 @@
 }
 .db-range-group button:not(.is-active):hover { color: var(--db-ink); }
 
-.db-compare-select {
+/* ---------- Custom date-range picker (kalender pembanding) ---------- */
+.db-daterange { position: relative; }
+.db-daterange-trigger {
   font-family: var(--font-mono), monospace;
   font-size: 12px;
   color: var(--db-ink);
   background: var(--db-panel);
   border: 1px solid var(--db-line);
   border-radius: 100px;
-  padding: 8px 28px 8px 14px;
+  padding: 8px 16px;
   cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2398a1b2' stroke-width='1.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
+  transition: border-color 0.15s, color 0.15s;
+  white-space: nowrap;
 }
-.db-compare-select:focus { outline: none; border-color: var(--db-signal); }
+.db-daterange-trigger:hover { border-color: var(--db-signal-dim); color: var(--db-signal); }
+
+.db-daterange-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  background: var(--db-panel);
+  border: 1px solid var(--db-line);
+  border-radius: 14px;
+  padding: 14px;
+  width: 280px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+.db-daterange-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+  color: var(--db-ink);
+  margin-bottom: 10px;
+}
+.db-daterange-nav button {
+  background: var(--db-panel-2);
+  border: 1px solid var(--db-line);
+  color: var(--db-ink-dim);
+  border-radius: 6px;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+.db-daterange-nav button:hover { color: var(--db-signal); border-color: var(--db-signal-dim); }
+
+.db-daterange-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 4px;
+}
+.db-daterange-weekdays span {
+  font-family: var(--font-mono), monospace;
+  font-size: 9.5px;
+  text-align: center;
+  color: var(--db-ink-dim);
+  text-transform: uppercase;
+}
+
+.db-daterange-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.db-daterange-day {
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--db-ink);
+  font-family: var(--font-body), sans-serif;
+  font-size: 12px;
+  padding: 6px 0;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.db-daterange-day:hover { background: var(--db-panel-2); }
+.db-daterange-day.is-muted { color: var(--db-ink-dim); opacity: 0.45; }
+.db-daterange-day.is-inrange { background: var(--db-signal-dim); color: var(--db-ink); }
+.db-daterange-day.is-endpoint { background: var(--db-signal); color: #04140e; font-weight: 600; }
+
+.db-daterange-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--db-line);
+}
+.db-daterange-preview {
+  font-family: var(--font-mono), monospace;
+  font-size: 10.5px;
+  color: var(--db-ink-dim);
+}
+.db-daterange-apply {
+  font-family: var(--font-mono), monospace;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #04140e;
+  background: var(--db-signal);
+  border: none;
+  border-radius: 100px;
+  padding: 7px 14px;
+  cursor: pointer;
+}
+.db-daterange-apply:disabled {
+  background: var(--db-signal-dim);
+  color: var(--db-ink-dim);
+  cursor: default;
+}
 
 .db-compare-hint {
   margin: -14px 0 26px;
