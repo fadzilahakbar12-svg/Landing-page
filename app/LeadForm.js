@@ -42,76 +42,43 @@ export default function LeadForm() {
 
   if (status === "done") {
     return (
-      <div className="mt-8 w-full max-w-sm rounded-xl border border-green-200 bg-green-50 px-6 py-5 text-center">
-        <p className="font-semibold text-green-800">Terima kasih!</p>
-        <p className="mt-1 text-sm text-green-700">
-          Data kamu sudah kami terima. Kami akan segera menghubungi kamu.
-        </p>
+      <div className="hm-done">
+        <p>Terima kasih!</p>
+        <p>Data kamu sudah kami terima. Kami akan segera menghubungi kamu.</p>
       </div>
     );
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="mt-8 flex w-full max-w-sm flex-col gap-3 text-left"
-    >
+    <form onSubmit={handleSubmit} className="hm-form">
       {/* Honeypot — hidden from real visitors via CSS, bots fill every field blindly */}
       <input
         type="text"
         name="website"
         tabIndex={-1}
         autoComplete="off"
-        className="absolute left-[-9999px] h-0 w-0 opacity-0"
+        style={{ position: "absolute", left: "-9999px", width: 0, height: 0, opacity: 0 }}
         aria-hidden="true"
       />
 
-      <div>
-        <label htmlFor="name" className="mb-1 block text-sm font-medium text-zinc-700">
-          Nama
-        </label>
-        <input
-          id="name"
-          name="name"
-          type="text"
-          placeholder="Nama lengkap kamu"
-          className="w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-        />
+      <div className="hm-field">
+        <label htmlFor="name">Nama</label>
+        <input id="name" name="name" type="text" placeholder="Nama lengkap kamu" />
       </div>
 
-      <div>
-        <label htmlFor="whatsapp" className="mb-1 block text-sm font-medium text-zinc-700">
-          Nomor WhatsApp
-        </label>
-        <input
-          id="whatsapp"
-          name="whatsapp"
-          type="tel"
-          placeholder="08xxxxxxxxxx"
-          className="w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-        />
+      <div className="hm-field">
+        <label htmlFor="whatsapp">Nomor WhatsApp</label>
+        <input id="whatsapp" name="whatsapp" type="tel" placeholder="08xxxxxxxxxx" />
       </div>
 
-      <div>
-        <label htmlFor="email" className="mb-1 block text-sm font-medium text-zinc-700">
-          Email
-        </label>
-        <input
-          id="email"
-          name="email"
-          type="email"
-          placeholder="kamu@email.com"
-          className="w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-        />
+      <div className="hm-field">
+        <label htmlFor="email">Email</label>
+        <input id="email" name="email" type="email" placeholder="kamu@email.com" />
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="hm-error">{error}</p>}
 
-      <button
-        type="submit"
-        disabled={status === "loading"}
-        className="mt-2 rounded-full bg-blue-600 px-8 py-3 text-base font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
-      >
+      <button type="submit" disabled={status === "loading"} className="hm-submit">
         {status === "loading" ? "Mengirim..." : "Gabung Sekarang"}
       </button>
     </form>

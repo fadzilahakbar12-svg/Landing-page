@@ -1,5 +1,6 @@
 import { Fraunces, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import Link from "next/link";
+import CursorGlow from "../components/CursorGlow";
 import "./styles.css";
 
 const fraunces = Fraunces({
@@ -27,6 +28,7 @@ export const metadata = {
 export default function CaraKerjaPage() {
   return (
     <main className={`wf-flyer ${fraunces.variable} ${plexSans.variable} ${plexMono.variable}`}>
+      <CursorGlow />
       <div className="wf-flyer-inner">
         <Link href="/" className="wf-back">
           ← Kembali

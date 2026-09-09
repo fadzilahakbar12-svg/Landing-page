@@ -1,0 +1,248 @@
+/* Homepage -- tema sama persis dengan /cara-kerja & /dashboard. Di-scope di
+   bawah .hm-page supaya tidak bocor ke halaman lain (3 namespace terpisah:
+   wf-* untuk cara-kerja, db-* untuk dashboard, hm-* untuk homepage). */
+
+.hm-page {
+  --hm-bg: #0e1014;
+  --hm-panel: #171a21;
+  --hm-line: #2a2f3a;
+  --hm-ink: #eef1f6;
+  --hm-ink-dim: #98a1b2;
+  --hm-signal: #38d99b;
+  --hm-signal-dim: #1f5b47;
+  --hm-warm: #ff9d5c;
+
+  background: var(--hm-bg);
+  color: var(--hm-ink);
+  font-family: var(--font-body), "Segoe UI", system-ui, sans-serif;
+  line-height: 1.55;
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 24px;
+  overflow: hidden;
+}
+.hm-page *,
+.hm-page *::before,
+.hm-page *::after {
+  box-sizing: border-box;
+}
+.hm-page::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(56, 217, 155, 0.08), transparent 42%),
+    radial-gradient(circle at 88% 90%, rgba(255, 157, 92, 0.06), transparent 46%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* cursor glow -- petakan var generik ke token homepage */
+.hm-page {
+  --cg-1: 56, 217, 155;
+  --cg-2: 255, 157, 92;
+  --cg-accent: var(--hm-signal);
+}
+
+.cg-root {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.cg-a,
+.cg-b {
+  position: fixed;
+  top: 0;
+  left: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  will-change: transform;
+}
+.cg-a {
+  width: 560px;
+  height: 560px;
+  margin-left: -280px;
+  margin-top: -280px;
+  background: radial-gradient(circle, rgba(var(--cg-1), 0.14) 0%, rgba(var(--cg-1), 0.04) 40%, transparent 70%);
+}
+.cg-b {
+  width: 240px;
+  height: 240px;
+  margin-left: -120px;
+  margin-top: -120px;
+  background: radial-gradient(circle, rgba(var(--cg-2), 0.16) 0%, transparent 65%);
+}
+.cg-dot {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 7px;
+  height: 7px;
+  margin-left: -3.5px;
+  margin-top: -3.5px;
+  border-radius: 50%;
+  background: var(--cg-accent);
+  box-shadow: 0 0 10px 2px var(--cg-accent);
+  pointer-events: none;
+  z-index: 100;
+}
+.cg-particle {
+  position: fixed;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--cg-accent);
+  pointer-events: none;
+  z-index: 1;
+  animation: cg-particle-fade 900ms ease-out forwards;
+}
+@keyframes cg-particle-fade {
+  0% { opacity: 0.75; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.2) translateY(-14px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cg-root { display: none; }
+}
+
+.hm-inner {
+  max-width: 620px;
+  width: 100%;
+  text-align: center;
+  position: relative;
+  z-index: 1;
+}
+
+.hm-eyebrow {
+  font-family: var(--font-mono), monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--hm-signal);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+.hm-eyebrow::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--hm-signal);
+  box-shadow: 0 0 0 3px var(--hm-signal-dim);
+}
+
+.hm-page a.hm-link {
+  display: block;
+  font-family: var(--font-mono), monospace;
+  font-size: 12.5px;
+  color: var(--hm-ink-dim);
+  text-decoration: none;
+  margin-bottom: 20px;
+  transition: color 0.15s;
+}
+.hm-page a.hm-link:hover { color: var(--hm-signal); }
+
+.hm-page h1 {
+  font-family: var(--font-display), Georgia, serif;
+  font-weight: 600;
+  font-size: clamp(32px, 6vw, 48px);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  margin: 0 0 18px;
+  text-wrap: balance;
+}
+.hm-page h1 em {
+  font-style: italic;
+  font-weight: 500;
+  color: var(--hm-warm);
+}
+
+.hm-lede {
+  font-size: 16px;
+  color: var(--hm-ink-dim);
+  max-width: 46ch;
+  margin: 0 auto;
+}
+
+/* ---------- Form lead ---------- */
+.hm-form {
+  margin: 32px auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 380px;
+  text-align: left;
+}
+.hm-field label {
+  display: block;
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--hm-ink-dim);
+  margin-bottom: 6px;
+}
+.hm-field input {
+  width: 100%;
+  background: var(--hm-panel);
+  border: 1px solid var(--hm-line);
+  border-radius: 10px;
+  padding: 11px 14px;
+  font-family: var(--font-body), sans-serif;
+  font-size: 14px;
+  color: var(--hm-ink);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.hm-field input::placeholder { color: var(--hm-ink-dim); }
+.hm-field input:focus { border-color: var(--hm-signal); }
+
+.hm-error {
+  font-size: 13px;
+  color: var(--hm-warm);
+  margin: 0;
+}
+
+.hm-submit {
+  margin-top: 4px;
+  font-family: var(--font-body), sans-serif;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #04140e;
+  background: var(--hm-signal);
+  border: none;
+  border-radius: 100px;
+  padding: 13px 24px;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+.hm-submit:hover { filter: brightness(1.08); }
+.hm-submit:disabled { background: var(--hm-signal-dim); color: var(--hm-ink-dim); cursor: default; }
+
+.hm-done {
+  margin: 32px auto 0;
+  max-width: 380px;
+  background: var(--hm-panel);
+  border: 1px solid var(--hm-signal-dim);
+  border-radius: 14px;
+  padding: 20px 22px;
+  text-align: center;
+}
+.hm-done p:first-child {
+  font-family: var(--font-display), Georgia, serif;
+  font-weight: 600;
+  font-size: 17px;
+  color: var(--hm-signal);
+  margin: 0 0 6px;
+}
+.hm-done p:last-child {
+  font-size: 13.5px;
+  color: var(--hm-ink-dim);
+  margin: 0;
+}

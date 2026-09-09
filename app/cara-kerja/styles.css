@@ -47,6 +47,74 @@
   z-index: 0;
 }
 
+/* ---------- Latar neon interaktif (ikut kursor) ---------- */
+.wf-flyer {
+  --cg-1: 56, 217, 155; /* hijau signal, sama seperti dashboard */
+  --cg-2: 255, 157, 92; /* aksen warm kedua */
+  --cg-accent: var(--wf-signal);
+}
+.cg-root {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.cg-a,
+.cg-b {
+  position: fixed;
+  top: 0;
+  left: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  will-change: transform;
+}
+.cg-a {
+  width: 560px;
+  height: 560px;
+  margin-left: -280px;
+  margin-top: -280px;
+  background: radial-gradient(circle, rgba(var(--cg-1), 0.14) 0%, rgba(var(--cg-1), 0.04) 40%, transparent 70%);
+}
+.cg-b {
+  width: 240px;
+  height: 240px;
+  margin-left: -120px;
+  margin-top: -120px;
+  background: radial-gradient(circle, rgba(var(--cg-2), 0.16) 0%, transparent 65%);
+}
+.cg-dot {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 7px;
+  height: 7px;
+  margin-left: -3.5px;
+  margin-top: -3.5px;
+  border-radius: 50%;
+  background: var(--cg-accent);
+  box-shadow: 0 0 10px 2px var(--cg-accent);
+  pointer-events: none;
+  z-index: 100;
+}
+.cg-particle {
+  position: fixed;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--cg-accent);
+  pointer-events: none;
+  z-index: 1;
+  animation: cg-particle-fade 900ms ease-out forwards;
+}
+@keyframes cg-particle-fade {
+  0% { opacity: 0.75; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.2) translateY(-14px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cg-root { display: none; }
+}
+
 .wf-back {
   display: inline-flex;
   align-items: center;

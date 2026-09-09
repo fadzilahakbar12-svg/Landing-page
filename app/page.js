@@ -1,28 +1,45 @@
+import { Fraunces, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import Link from "next/link";
 import LeadForm from "./LeadForm";
+import CursorGlow from "./components/CursorGlow";
+import "./home.css";
+
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  weight: ["500", "600"],
+  style: ["normal", "italic"],
+  variable: "--font-display",
+});
+const plexSans = IBM_Plex_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-body",
+});
+const plexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-mono",
+});
 
 export default function Home() {
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center bg-white px-6 py-16 text-center">
-      {/* Ganti teks di bawah ini sesuai produk/jasa kamu */}
-      <p className="text-sm font-semibold uppercase tracking-wide text-blue-600">
-        Landing Page
-      </p>
-      <Link
-        href="/cara-kerja"
-        className="mt-2 text-sm text-zinc-500 underline decoration-zinc-300 underline-offset-4 hover:text-blue-600"
-      >
-        Lihat cara kerja di balik layar →
-      </Link>
-      <h1 className="mt-4 max-w-2xl text-4xl font-bold text-zinc-900 sm:text-5xl">
-        Judul Utama Kamu di Sini
-      </h1>
-      <p className="mt-6 max-w-xl text-lg text-zinc-600">
-        Tulis satu-dua kalimat yang menjelaskan apa yang kamu tawarkan dan
-        kenapa orang harus tertarik.
-      </p>
+    <main className={`hm-page ${fraunces.variable} ${plexSans.variable} ${plexMono.variable}`}>
+      <CursorGlow />
+      <div className="hm-inner">
+        <p className="hm-eyebrow">Landing Page</p>
+        <Link href="/cara-kerja" className="hm-link">
+          Lihat cara kerja di balik layar →
+        </Link>
+        <h1>
+          Judul Utama <em>Kamu</em> di Sini
+        </h1>
+        <p className="hm-lede">
+          Tulis satu-dua kalimat yang menjelaskan apa yang kamu tawarkan dan
+          kenapa orang harus tertarik.
+        </p>
 
-      <LeadForm />
+        <LeadForm />
+      </div>
     </main>
   );
 }
