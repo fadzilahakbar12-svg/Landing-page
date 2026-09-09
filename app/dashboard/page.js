@@ -2,6 +2,8 @@ import { Fraunces, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import { fetchLeads } from "@/lib/leads";
 import { fetchSites } from "@/lib/sites";
 import { getEngineState } from "@/lib/engine";
+import { fetchStatsHistory } from "@/lib/statsHistory";
+import { computeWaCounts, waFunnel, emailFunnel } from "@/lib/metrics";
 import AddSiteForm from "./AddSiteForm";
 import EngineToggle from "./EngineToggle";
 import "./styles.css";
@@ -61,36 +63,32 @@ function formatRelative(dateValue) {
   return `${Math.floor(hours / 24)} hari lalu`;
 }
 
-function computeCounts(leads) {
-  const counts = { pending: 0, sent: 0, read: 0, connected: 0, manual: 0, fail: 0 };
-  for (const lead of leads) {
-    const status = lead.waStatus;
-    if (status === "read" || status === "connected" || status === "fail" || status === "sent" || status === "manual") {
-      counts[status]++;
-    } else {
-      counts.pending++;
+// Cari snapshot StatsHistory dengan tanggal PALING DEKAT tapi tidak lewat
+// targetDate -- bukan harus PERSIS tanggal itu, supaya tetap bisa hitung
+// perbandingan meski ada hari yang kelewat kecatat (mis. sebelum fitur ini
+// ada, atau redeploy sempat gagal semalam).
+function findSnapshotOnOrBefore(history, targetDate) {
+  const targetStr = targetDate.toISOString().slice(0, 10);
+  let best = null;
+  for (const row of history) {
+    if (String(row.date).slice(0, 10) <= targetStr) {
+      if (!best || String(row.date) > String(best.date)) best = row;
     }
   }
-  return counts;
+  return best;
 }
 
-// Funnel WA: "Terkirim" itu KUMULATIF (siapapun yang pernah dikirimi, apapun
-// status TERKINI-nya sekarang) -- bukan cuma yang masih persis di status
-// "sent" (itu sudah "lewat" begitu statusnya maju ke read/connected).
-function waFunnel(counts) {
-  const sent = counts.sent + counts.read + counts.connected + counts.fail;
-  const read = counts.read + counts.connected; // "connected" pasti sudah lewat "dibaca"
-  const connected = counts.connected;
-  return { sent, read, connected };
+function daysAgo(n) {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - n);
+  return d;
 }
 
-// Funnel Email: sama logikanya, dari emailSentAt/emailStatus (kolom terpisah
-// dari WA sejak Fase 1) -- "clicked" pasti sudah lewat "opened".
-function emailFunnel(leads) {
-  const sent = leads.filter((l) => l.emailSentAt).length;
-  const opened = leads.filter((l) => l.emailStatus === "opened" || l.emailStatus === "clicked").length;
-  const clicked = leads.filter((l) => l.emailStatus === "clicked").length;
-  return { sent, opened, clicked };
+// delta > 0: naik (hijau, ▲). delta < 0: turun (warm, ▼). null: belum ada
+// data pembanding sama sekali (baris pertama sejak fitur ini dipasang).
+function delta(current, past) {
+  if (past === null || past === undefined) return null;
+  return current - past;
 }
 
 function pct(numerator, denominator) {
@@ -129,15 +127,37 @@ export default async function DashboardPage() {
     // diam-diam anggap "jalan" padahal statusnya tidak terbaca.
   }
 
+  let statsHistory = [];
+  try {
+    statsHistory = await fetchStatsHistory();
+  } catch {
+    // belum ada tab StatsHistory / gagal baca -- kartu perbandingan cukup
+    // tampil "belum ada data", tidak perlu menggagalkan seluruh dashboard.
+  }
+
   const sortedSites = [...sites].sort(
     (a, b) => (PRIORITY_ORDER[a.priority] ?? 4) - (PRIORITY_ORDER[b.priority] ?? 4)
   );
 
   const total = leads.length;
-  const counts = computeCounts(leads);
+  const counts = computeWaCounts(leads);
   const wa = waFunnel(counts);
   const email = emailFunnel(leads);
   const combinedSent = wa.sent + email.sent; // gabungan 2 channel (WA + Email), bukan cuma WA
+
+  const compareWindows = [
+    { key: "day", label: "Hari ke Hari", days: 1 },
+    { key: "week", label: "Minggu ke Minggu", days: 7 },
+    { key: "month", label: "Bulan ke Bulan", days: 30 },
+  ].map(({ key, label, days }) => {
+    const snapshot = findSnapshotOnOrBefore(statsHistory, daysAgo(days));
+    return {
+      key,
+      label,
+      totalDelta: snapshot ? delta(total, snapshot.totalLeads) : null,
+      sentDelta: snapshot ? delta(combinedSent, snapshot.waSent + snapshot.emailSent) : null,
+    };
+  });
 
   return (
     <main className={`db-panel ${fraunces.variable} ${plexSans.variable} ${plexMono.variable}`}>
@@ -186,6 +206,39 @@ export default async function DashboardPage() {
             <p className="db-tile-value">{counts.fail}</p>
             <p className="db-tile-sub">nomor tidak valid</p>
           </div>
+        </div>
+
+        <div className="db-section-head">
+          <h2>Perbandingan</h2>
+          <span className="db-hint">Total Leads &amp; Terkirim</span>
+        </div>
+
+        <div className="db-compare-grid">
+          {compareWindows.map((w) => (
+            <div className="db-compare-card" key={w.key}>
+              <p className="db-compare-label">{w.label}</p>
+              <div className="db-compare-row">
+                <span className="db-compare-metric">Total Leads</span>
+                {w.totalDelta === null ? (
+                  <span className="db-compare-badge is-none">belum ada data</span>
+                ) : (
+                  <span className={`db-compare-badge ${w.totalDelta > 0 ? "is-up" : w.totalDelta < 0 ? "is-down" : "is-flat"}`}>
+                    {w.totalDelta > 0 ? "▲" : w.totalDelta < 0 ? "▼" : "—"} {Math.abs(w.totalDelta)}
+                  </span>
+                )}
+              </div>
+              <div className="db-compare-row">
+                <span className="db-compare-metric">Terkirim</span>
+                {w.sentDelta === null ? (
+                  <span className="db-compare-badge is-none">belum ada data</span>
+                ) : (
+                  <span className={`db-compare-badge ${w.sentDelta > 0 ? "is-up" : w.sentDelta < 0 ? "is-down" : "is-flat"}`}>
+                    {w.sentDelta > 0 ? "▲" : w.sentDelta < 0 ? "▼" : "—"} {Math.abs(w.sentDelta)}
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
 
         <div className="db-section-head">

@@ -211,6 +211,59 @@
   color: var(--db-ink-dim);
 }
 
+/* ---------- Perbandingan (day/week/month) ---------- */
+.db-compare-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 32px;
+}
+.db-compare-card {
+  background: var(--db-panel);
+  border: 1px solid var(--db-line);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+.db-compare-label {
+  font-family: var(--font-mono), monospace;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--db-ink-dim);
+  margin: 0 0 12px;
+}
+.db-compare-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+}
+.db-compare-row + .db-compare-row {
+  border-top: 1px solid var(--db-line);
+}
+.db-compare-metric {
+  font-size: 13px;
+  color: var(--db-ink);
+}
+.db-compare-badge {
+  font-family: var(--font-mono), monospace;
+  font-size: 12.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.db-compare-badge.is-up { color: var(--db-signal); }
+.db-compare-badge.is-down { color: var(--db-warm); }
+.db-compare-badge.is-flat { color: var(--db-ink-dim); }
+.db-compare-badge.is-none {
+  color: var(--db-ink-dim);
+  font-size: 10.5px;
+  font-style: italic;
+}
+
+@media (max-width: 720px) {
+  .db-compare-grid { grid-template-columns: 1fr; }
+}
+
 /* ---------- Funnel per sumber (WA vs Email) ---------- */
 .db-funnel-grid {
   display: grid;
