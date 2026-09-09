@@ -78,7 +78,11 @@ export async function GET(request) {
           name: lead.company,
           whatsapp: lead.whatsapp || "",
           email: lead.email || "",
-          source: "auto-scraper",
+          // Link ke HOMEPAGE situs sumber (bukan link halaman lowongan
+          // spesifiknya) -- ini yang jadi isi kolom "source" di sheet, dan
+          // domainnya dipakai Apps Script untuk bikin inisial LeadID (mis.
+          // dealls.com -> "DS").
+          source: `https://${site.domain}`,
         }),
       });
       if (res.ok) leadsSent++;
