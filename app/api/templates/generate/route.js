@@ -1,13 +1,14 @@
-import { fetchTemplates, addTemplate } from "@/lib/templates";
-import { generateTemplateWithAI } from "@/lib/gemini";
+import { fetchTemplates, addTemplate, saveTemplateAsset } from "@/lib/templates";
+import { generateTemplateWithAI, generateTemplateImageWithAI } from "@/lib/gemini";
 
 const VALID_CHANNELS = ["email", "whatsapp"];
 const VALID_STAGES = ["new", "followup"];
 
-// Tombol "✨ Generate dengan AI" di dashboard -- generate draft (Gemini),
-// LANGSUNG disimpan ke Template sheet (belum ada UI edit/preview-dulu untuk
-// versi pertama ini; operator bisa lihat & hapus manual dari spreadsheet
-// kalau hasilnya kurang pas).
+// Tombol "✨ Generate dengan AI" di dashboard -- generate draft teks (Gemini,
+// structured output) + 1 gambar pendukung (Gemini image, tema disesuaikan
+// isi pesannya), LANGSUNG disimpan ke Template sheet + Google Drive. Belum
+// ada UI edit/preview-dulu untuk versi pertama ini; operator bisa lihat &
+// hapus manual dari spreadsheet/Drive kalau hasilnya kurang pas.
 export async function POST(request) {
   const body = await request.json();
   const channel = String(body.channel || "").trim().toLowerCase();
@@ -30,7 +31,23 @@ export async function POST(request) {
     const generated = await generateTemplateWithAI({ channel, stage, existingBodies });
     const templateId = await addTemplate({ channel, stage, subject: generated.subject, body: generated.body });
 
-    return Response.json({ ok: true, templateId, ...generated });
+    // Gambar itu "bonus" -- kalau gagal (mis. kena safety filter, atau
+    // GEMINI_API_KEY sedang bermasalah), template TEKS-nya tetap tersimpan
+    // dan dipakai seperti biasa. Jangan sampai satu gagal menjatuhkan semua.
+    let assetUrl = null;
+    let assetError = null;
+    try {
+      const image = await generateTemplateImageWithAI({ channel, stage, subject: generated.subject, body: generated.body });
+      if (image) {
+        assetUrl = await saveTemplateAsset(templateId, image);
+      } else {
+        assetError = "Gemini tidak menghasilkan gambar (kemungkinan kena safety filter).";
+      }
+    } catch (err) {
+      assetError = String(err.message || err);
+    }
+
+    return Response.json({ ok: true, templateId, ...generated, assetUrl, assetError });
   } catch (err) {
     return Response.json({ ok: false, error: String(err.message || err) }, { status: 502 });
   }

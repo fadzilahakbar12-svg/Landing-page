@@ -306,6 +306,7 @@ export default async function DashboardPage() {
             <table className="db-table">
               <thead>
                 <tr>
+                  <th>Asset</th>
                   <th>Template ID</th>
                   <th>Channel</th>
                   <th>Stage</th>
@@ -316,6 +317,16 @@ export default async function DashboardPage() {
               <tbody>
                 {templates.map((t) => (
                   <tr key={t.templateId}>
+                    <td>
+                      {t.asset ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- gambar dari Google Drive, bukan aset lokal
+                        <a href={t.asset} target="_blank" rel="noopener noreferrer">
+                          <img src={t.asset} alt="" className="db-template-thumb" />
+                        </a>
+                      ) : (
+                        <span className="db-hint">—</span>
+                      )}
+                    </td>
                     <td><span className="db-site-name">{t.templateId}</span></td>
                     <td>{CHANNEL_LABEL[t.channel] || t.channel}</td>
                     <td>{STAGE_LABEL[t.stage] || t.stage}</td>

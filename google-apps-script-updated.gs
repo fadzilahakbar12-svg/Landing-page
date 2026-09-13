@@ -66,10 +66,24 @@ function getTemplateSheet_() {
   var sheet = ss.getSheetByName(TEMPLATE_SHEET_NAME);
   if (!sheet) {
     sheet = ss.insertSheet(TEMPLATE_SHEET_NAME);
-    sheet.appendRow(["templateID", "channel", "stage", "subject", "body", "score", "timesUsed", "lastScored"]);
-    sheet.getRange("A1:H1").setFontWeight("bold");
+    // "asset" (kolom I) ditambahkan belakangan (AI image generation) --
+    // ditaruh di UJUNG, bukan menyisip di antara kolom yang sudah ada
+    // (kolom F "score" tetap F, tidak geser) -- pola yang sama dipakai di
+    // schemaIssue/waTemplateId/emailTemplateId.
+    sheet.appendRow(["templateID", "channel", "stage", "subject", "body", "score", "timesUsed", "lastScored", "asset"]);
+    sheet.getRange("A1:I1").setFontWeight("bold");
   }
   return sheet;
+}
+
+// Folder Google Drive tempat nyimpen gambar hasil generate AI (lib/gemini.js
+// #generateTemplateImageWithAI) -- dibuat otomatis kalau belum ada, di Drive
+// milik akun yang menjalankan Apps Script ini (akun yang deploy web app-nya).
+function getAssetFolder_() {
+  var name = "BarScrapper Template Assets";
+  var folders = DriveApp.getFoldersByName(name);
+  if (folders.hasNext()) return folders.next();
+  return DriveApp.createFolder(name);
 }
 
 function nextTemplateId_(sheet, channel) {
@@ -308,9 +322,37 @@ function doPost(e) {
       "",  // score -- belum ada data pemakaian
       0,   // timesUsed
       "",  // lastScored
+      "",  // asset -- diisi belakangan lewat action "saveTemplateAsset"
     ]);
     return ContentService
       .createTextOutput(JSON.stringify({ ok: true, templateId: templateId }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // Dipanggil setelah lib/gemini.js#generateTemplateImageWithAI berhasil --
+  // decode base64 -> simpan sebagai file ke Google Drive (folder khusus,
+  // lihat getAssetFolder_) -> share "anyone with link, view only" -> tulis
+  // URL-nya ke kolom asset (I) baris template terkait.
+  if (data.action === "saveTemplateAsset") {
+    var tplSheet4 = getTemplateSheet_();
+    var tplRows3 = tplSheet4.getDataRange().getValues();
+    var tplRowIndex2 = -1;
+    for (var t3 = 1; t3 < tplRows3.length; t3++) {
+      if (String(tplRows3[t3][0]) === String(data.templateId)) { tplRowIndex2 = t3 + 1; break; }
+    }
+    if (tplRowIndex2 === -1) {
+      return ContentService
+        .createTextOutput(JSON.stringify({ ok: false, error: "templateId tidak ditemukan." }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    var bytes = Utilities.base64Decode(data.dataBase64);
+    var blob = Utilities.newBlob(bytes, data.mimeType || "image/png", String(data.templateId) + ".png");
+    var file = getAssetFolder_().createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    var assetUrl = "https://drive.google.com/uc?export=view&id=" + file.getId();
+    tplSheet4.getRange(tplRowIndex2, 9).setValue(assetUrl);
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: true, assetUrl: assetUrl }))
       .setMimeType(ContentService.MimeType.JSON);
   }
 
@@ -549,6 +591,7 @@ function doGet(e) {
         score: tplRows2[tp][5] === "" ? null : Number(tplRows2[tp][5]),
         timesUsed: Number(tplRows2[tp][6] || 0),
         lastScored: tplRows2[tp][7] || null,
+        asset: tplRows2[tp][8] || "",
       });
     }
     return ContentService
@@ -774,6 +817,18 @@ function setupSiteStats() {
       .setRanges([priorityRange])
       .build(),
   ]);
+}
+
+// Run this ONCE (pilih "migrateAddTemplateAssetColumn" di dropdown function,
+// klik Run), SEKALI SAJA -- hanya perlu kalau tab Template Anda dibuat
+// SEBELUM kolom "asset" ditambahkan. No-op kalau header-nya sudah "asset".
+function migrateAddTemplateAssetColumn() {
+  var sheet = getTemplateSheet_();
+  if (String(sheet.getRange("I1").getValue()) === "asset") {
+    return; // sudah pernah dijalankan
+  }
+  sheet.getRange("I1").setValue("asset");
+  sheet.getRange("I1").setFontWeight("bold");
 }
 
 // Run this ONCE (pilih "migrateAddTemplateIdColumns" di dropdown function,
