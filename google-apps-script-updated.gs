@@ -13,6 +13,7 @@ var LEADS_SHEET_NAME = "Sheet1";
 var SITESTATS_SHEET_NAME = "SiteStats";
 var STATSHISTORY_SHEET_NAME = "StatsHistory";
 var JOBHEALTH_SHEET_NAME = "JobHealth";
+var TEMPLATE_SHEET_NAME = "Template";
 
 // Skema kolom leads (sejak LeadID ditambahkan di kolom A, semua kolom lain
 // geser +1 dari sebelumnya):
@@ -53,6 +54,42 @@ function getJobHealthSheet_() {
     sheet.getRange("A1:E1").setFontWeight("bold");
   }
   return sheet;
+}
+
+// Perpustakaan template pesan (Email & WhatsApp), dibuat manual ATAU lewat
+// tombol "Generate dengan AI" di dashboard (lib/gemini.js). "score" & "timesUsed"
+// dihitung ulang di sisi Next.js (lib/templates.js#recomputeAndSaveScores,
+// dipanggil on-demand tiap dashboard dibuka) dari data Leads (kolom
+// waTemplateId/emailTemplateId) -- tab ini sendiri cuma penyimpanan pasif.
+function getTemplateSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(TEMPLATE_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(TEMPLATE_SHEET_NAME);
+    sheet.appendRow(["templateID", "channel", "stage", "subject", "body", "score", "timesUsed", "lastScored"]);
+    sheet.getRange("A1:H1").setFontWeight("bold");
+  }
+  return sheet;
+}
+
+function nextTemplateId_(sheet, channel) {
+  var prefix = channel === "email" ? "EM" : "WA";
+  var lastRow = sheet.getLastRow();
+  var maxN = 0;
+  if (lastRow > 1) {
+    var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    var re = new RegExp("^" + prefix + "-(\\d+)$");
+    for (var i = 0; i < ids.length; i++) {
+      var m = String(ids[i][0]).match(re);
+      if (m) {
+        var n = parseInt(m[1], 10);
+        if (n > maxN) maxN = n;
+      }
+    }
+  }
+  var next = maxN + 1;
+  var padded = next < 1000 ? ("00" + next).slice(-3) : String(next);
+  return prefix + "-" + padded;
 }
 
 // Riwayat harian (Fase: perbandingan day-to-day/week-on-week/monthly di
@@ -151,6 +188,12 @@ function doPost(e) {
   if (data.action === "setWaMeta") {
     if (data.status) sheet.getRange(data.row, 7).setValue(data.status); // column G = status
     if (data.fonnteMessageId) sheet.getRange(data.row, 8).setValue(data.fonnteMessageId); // column H
+    // waTemplateId (column L) -- template mana yang dipakai buat pesan ini,
+    // dipakai lib/templates.js buat hitung skor per-template. Cuma ditulis
+    // saat status "sent" (pertama kali kirim), bukan pas webhook Fonnte
+    // update status jadi read/connected/fail -- template-nya sudah tetap
+    // sejak baris ini pertama kali dikirim.
+    if (data.waTemplateId) sheet.getRange(data.row, 12).setValue(data.waTemplateId);
     return ContentService
       .createTextOutput(JSON.stringify({ ok: true }))
       .setMimeType(ContentService.MimeType.JSON);
@@ -162,6 +205,10 @@ function doPost(e) {
   if (data.action === "markEmailSent") {
     sheet.getRange(data.row, 10).setValue(new Date()); // column J = EmailSentAt
     sheet.getRange(data.row, 11).setValue(data.emailStatus || "sent"); // column K = emailStatus
+    // emailTemplateId (column M) -- sama seperti waTemplateId di atas, cuma
+    // ditulis saat "sent" (pertama/re-kirim), status opened/clicked lewat
+    // webhook Resend tidak menimpa ini.
+    if (data.emailTemplateId) sheet.getRange(data.row, 13).setValue(data.emailTemplateId);
     return ContentService
       .createTextOutput(JSON.stringify({ ok: true }))
       .setMimeType(ContentService.MimeType.JSON);
@@ -225,6 +272,67 @@ function doPost(e) {
     } else {
       jhSheet.getRange(jhRowIndex, 1, 1, jhValues.length).setValues([jhValues]);
     }
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: true }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // ---- Template: perpustakaan pesan Email & WhatsApp ----
+  if (data.action === "addTemplate") {
+    var channel = String(data.channel || "").trim().toLowerCase();
+    if (channel !== "email" && channel !== "whatsapp") {
+      return ContentService
+        .createTextOutput(JSON.stringify({ ok: false, error: "channel harus 'email' atau 'whatsapp'." }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    var stage = String(data.stage || "").trim().toLowerCase();
+    if (stage !== "new" && stage !== "followup") {
+      return ContentService
+        .createTextOutput(JSON.stringify({ ok: false, error: "stage harus 'new' atau 'followup'." }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    var body = String(data.body || "").trim();
+    if (!body) {
+      return ContentService
+        .createTextOutput(JSON.stringify({ ok: false, error: "Isi template kosong." }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    var tplSheet = getTemplateSheet_();
+    var templateId = nextTemplateId_(tplSheet, channel);
+    tplSheet.appendRow([
+      templateId,
+      channel,
+      stage,
+      channel === "email" ? String(data.subject || "").trim() : "",
+      body,
+      "",  // score -- belum ada data pemakaian
+      0,   // timesUsed
+      "",  // lastScored
+    ]);
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: true, templateId: templateId }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // Dipanggil oleh lib/templates.js#recomputeAndSaveScores (on-demand, tiap
+  // dashboard dibuka) setelah menghitung ulang skor tiap template dari data
+  // Leads sisi Next.js -- tab Template sendiri tidak menghitung apa-apa,
+  // cuma menyimpan hasil akhirnya.
+  if (data.action === "setTemplateScore") {
+    var tplSheet2 = getTemplateSheet_();
+    var tplRows = tplSheet2.getDataRange().getValues();
+    var tplRowIndex = -1;
+    for (var tr = 1; tr < tplRows.length; tr++) {
+      if (String(tplRows[tr][0]) === String(data.templateId)) { tplRowIndex = tr + 1; break; }
+    }
+    if (tplRowIndex === -1) {
+      return ContentService
+        .createTextOutput(JSON.stringify({ ok: false, error: "templateId tidak ditemukan." }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    tplSheet2.getRange(tplRowIndex, 6).setValue(data.score === null || data.score === undefined ? "" : Number(data.score));
+    tplSheet2.getRange(tplRowIndex, 7).setValue(Number(data.timesUsed || 0));
+    tplSheet2.getRange(tplRowIndex, 8).setValue(new Date());
     return ContentService
       .createTextOutput(JSON.stringify({ ok: true }))
       .setMimeType(ContentService.MimeType.JSON);
@@ -425,6 +533,29 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  // ?resource=templates -- perpustakaan template pesan (Email/WhatsApp).
+  if (e.parameter.resource === "templates") {
+    var tplSheet3 = getTemplateSheet_();
+    var tplRows2 = tplSheet3.getDataRange().getValues();
+    var templates = [];
+    for (var tp = 1; tp < tplRows2.length; tp++) {
+      if (!tplRows2[tp][0]) continue;
+      templates.push({
+        templateId: tplRows2[tp][0],
+        channel: tplRows2[tp][1],
+        stage: tplRows2[tp][2],
+        subject: tplRows2[tp][3] || "",
+        body: tplRows2[tp][4] || "",
+        score: tplRows2[tp][5] === "" ? null : Number(tplRows2[tp][5]),
+        timesUsed: Number(tplRows2[tp][6] || 0),
+        lastScored: tplRows2[tp][7] || null,
+      });
+    }
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: true, templates: templates }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   // ?resource=statsHistory -- riwayat snapshot harian (dipakai untuk hitung
   // perbandingan day-to-day/week-on-week/monthly di dashboard).
   if (e.parameter.resource === "statsHistory") {
@@ -468,6 +599,8 @@ function doGet(e) {
       source: rows[i][8] || "landing_page", // column I
       emailSentAt: rows[i][9] || null,    // column J
       emailStatus: rows[i][10] || null,   // column K
+      waTemplateId: rows[i][11] || null,    // column L -- lihat setWaMeta
+      emailTemplateId: rows[i][12] || null, // column M -- lihat markEmailSent
     });
   }
 
@@ -641,6 +774,21 @@ function setupSiteStats() {
       .setRanges([priorityRange])
       .build(),
   ]);
+}
+
+// Run this ONCE (pilih "migrateAddTemplateIdColumns" di dropdown function,
+// klik Run), SEKALI SAJA -- menambah header kolom L (waTemplateId) & M
+// (emailTemplateId) di tab Leads. APPEND di ujung (bukan disisipkan di
+// tengah seperti migrateAddLeadIdColumn) supaya semua kolom lain TIDAK
+// geser -- aman dijalankan kapan saja. No-op kalau sudah pernah dijalankan.
+function migrateAddTemplateIdColumns() {
+  var sheet = getLeadsSheet_();
+  if (String(sheet.getRange("L1").getValue()) === "waTemplateId") {
+    return; // sudah pernah dijalankan
+  }
+  sheet.getRange("L1").setValue("waTemplateId");
+  sheet.getRange("M1").setValue("emailTemplateId");
+  sheet.getRange("L1:M1").setFontWeight("bold");
 }
 
 // Run this ONCE (pilih "migrateAddSchemaIssueColumn" di dropdown function,

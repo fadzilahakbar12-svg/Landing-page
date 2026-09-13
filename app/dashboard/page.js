@@ -3,7 +3,9 @@ import { fetchLeads } from "@/lib/leads";
 import { fetchSites } from "@/lib/sites";
 import { getEngineState } from "@/lib/engine";
 import { fetchJobHealth } from "@/lib/jobHealth";
+import { fetchTemplates, recomputeAndSaveScores } from "@/lib/templates";
 import AddSiteForm from "./AddSiteForm";
+import TemplateGenerateForm from "./TemplateGenerateForm";
 import EngineToggle from "./EngineToggle";
 import StatsPanel from "./StatsPanel";
 import CursorGlow from "./CursorGlow";
@@ -77,6 +79,19 @@ function jobStatusMeta(status) {
   return JOB_STATUS_META[status] || { label: status || "belum pernah jalan", cls: "db-prio-rendah" };
 }
 
+const CHANNEL_LABEL = { email: "Email", whatsapp: "WhatsApp" };
+const STAGE_LABEL = { new: "New", followup: "Follow up" };
+
+function formatScore(score, timesUsed) {
+  if (!timesUsed) return "belum ada data";
+  return `${Math.round((score ?? 0) * 100)}% (${timesUsed}x kirim)`;
+}
+
+function truncate(text, max) {
+  const s = String(text || "");
+  return s.length > max ? s.slice(0, max).trimEnd() + "…" : s;
+}
+
 function formatRelative(dateValue) {
   if (!dateValue) return "belum pernah";
   const d = new Date(dateValue);
@@ -122,6 +137,18 @@ export default async function DashboardPage() {
   } catch {
     // biarkan default false (mati) kalau gagal baca -- lebih aman daripada
     // diam-diam anggap "jalan" padahal statusnya tidak terbaca.
+  }
+
+  // Skor template dihitung ulang ON-DEMAND tiap dashboard dibuka (bukan cron
+  // terjadwal) -- lihat lib/templates.js#recomputeAndSaveScores. Gagal di
+  // sini TIDAK boleh menjatuhkan seluruh halaman, cukup tampilkan skor lama.
+  let templates = [];
+  let templatesError = null;
+  try {
+    const rawTemplates = await fetchTemplates();
+    templates = leads.length ? await recomputeAndSaveScores(leads, rawTemplates) : rawTemplates;
+  } catch (err) {
+    templatesError = String(err);
   }
 
   const sortedSites = [...sites].sort(
@@ -255,6 +282,50 @@ export default async function DashboardPage() {
                     </tr>
                   );
                 })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="db-section-head">
+          <h2>Template Pesan</h2>
+          <div className="db-section-head-right">
+            <span className="db-hint">skor = % connected (WA) / % klik CTA (Email), dihitung dari data nyata</span>
+            <TemplateGenerateForm />
+          </div>
+        </div>
+
+        {templatesError && <div className="db-error">Gagal memuat template: {templatesError}</div>}
+
+        {!templatesError && templates.length === 0 && (
+          <div className="db-empty">Belum ada template. Klik &quot;✨ Generate Template Baru&quot; untuk mulai.</div>
+        )}
+
+        {!templatesError && templates.length > 0 && (
+          <div className="db-table-wrap">
+            <table className="db-table">
+              <thead>
+                <tr>
+                  <th>Template ID</th>
+                  <th>Channel</th>
+                  <th>Stage</th>
+                  <th>Isi</th>
+                  <th>Skor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {templates.map((t) => (
+                  <tr key={t.templateId}>
+                    <td><span className="db-site-name">{t.templateId}</span></td>
+                    <td>{CHANNEL_LABEL[t.channel] || t.channel}</td>
+                    <td>{STAGE_LABEL[t.stage] || t.stage}</td>
+                    <td title={t.channel === "email" ? `Subjek: ${t.subject}\n\n${t.body}` : t.body}>
+                      {t.channel === "email" && t.subject ? `${truncate(t.subject, 40)} — ` : ""}
+                      {truncate(t.body, 60)}
+                    </td>
+                    <td className="db-num">{formatScore(t.score, t.timesUsed)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

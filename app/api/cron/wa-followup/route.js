@@ -2,6 +2,7 @@ import { fetchLeads, markLeadFollowedUp, setLeadWaMeta } from "@/lib/leads";
 import { isWhatsappNumber, sendBulkFollowUpWhatsapp } from "@/lib/notify";
 import { getEngineState } from "@/lib/engine";
 import { recordJobRun } from "@/lib/jobHealth";
+import { fetchTemplates, pickTemplate, renderTemplate } from "@/lib/templates";
 
 const JOB_NAME = "wa-followup";
 
@@ -62,13 +63,28 @@ export async function GET(request) {
   // "delay" yang membuat Fonnte sendiri menjeda ~2 menit antar pengiriman --
   // request ini balas seketika (tidak menunggu semua pesan benar-benar
   // terkirim), jadi tidak kena batas waktu eksekusi function.
+  //
+  // Template dipilih SEKALI untuk SELURUH batch ini (beda dari email yang
+  // per-lead, lihat email-followup/route.js) -- Fonnte bulk send cuma
+  // menerima 1 "message" per request. stage selalu "new" untuk sekarang:
+  // wa-followup belum punya loop follow-up berulang seperti email (filter
+  // di atas cuma ambil yang followUpSentAt masih kosong, jadi semua yang
+  // masuk sini memang pesan PERTAMA). Kalau nanti ditambah WA follow-up
+  // ke-2/ke-3, tinggal hitung stage per-lead seperti di email-followup.
   if (validated.length) {
+    const templates = await fetchTemplates();
+    const template = pickTemplate(templates, { channel: "whatsapp", stage: "new" });
+    // "{name}" (kurung kurawal TUNGGAL) sengaja dipertahankan sebagai literal
+    // string di sini -- itu placeholder BAWAAN FONNTE untuk personalisasi per-
+    // nomor dalam 1 bulk send, beda dari "{{name}}" milik lib/templates.js.
+    const message = renderTemplate(template, "{name}").body;
+
     try {
-      const sent = await sendBulkFollowUpWhatsapp(validated);
+      const sent = await sendBulkFollowUpWhatsapp(validated, message);
       for (const { lead, fonnteMessageId } of sent) {
-        await setLeadWaMeta(lead.row, { status: "sent", fonnteMessageId });
+        await setLeadWaMeta(lead.row, { status: "sent", fonnteMessageId, waTemplateId: template.templateId ?? undefined });
         await markLeadFollowedUp(lead.row);
-        results.push({ row: lead.row, name: lead.name, ok: true });
+        results.push({ row: lead.row, name: lead.name, ok: true, templateId: template.templateId });
       }
     } catch (err) {
       // Seluruh batch gagal (mis. Fonnte down/kuota habis) -- tandai fail

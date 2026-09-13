@@ -2,6 +2,7 @@ import { fetchLeads, markLeadEmailSent } from "@/lib/leads";
 import { sendFollowUpEmail } from "@/lib/notify";
 import { getEngineState } from "@/lib/engine";
 import { recordJobRun } from "@/lib/jobHealth";
+import { fetchTemplates, pickTemplate, renderTemplate } from "@/lib/templates";
 
 const JOB_NAME = "email-followup";
 
@@ -43,12 +44,23 @@ export async function GET(request) {
   const leads = await fetchLeads();
   const pending = leads.filter(isEligible).slice(0, MAX_PER_BATCH);
 
+  // Template dipilih PER-LEAD (beda dari WA yang 1 batch = 1 template,
+  // lihat wa-followup/route.js) -- email dikirim 1-per-1 lewat Resend di
+  // sini, jadi tidak ada batasan "1 message per request" seperti Fonnte bulk.
+  const templates = await fetchTemplates();
+
   const results = [];
   for (const lead of pending) {
+    // stage: "new" kalau ini email PERTAMA ke lead ini, "followup" kalau
+    // sudah pernah (masuk sini lagi karena cooldown 7 hari lewat & belum klik).
+    const stage = lead.emailSentAt ? "followup" : "new";
+    const template = pickTemplate(templates, { channel: "email", stage });
+    const rendered = renderTemplate(template, lead.name);
+
     try {
-      await sendFollowUpEmail(lead);
-      await markLeadEmailSent(lead.row, "sent");
-      results.push({ row: lead.row, name: lead.name, ok: true });
+      await sendFollowUpEmail(lead, { subject: rendered.subject, text: rendered.body });
+      await markLeadEmailSent(lead.row, "sent", template.templateId ?? undefined);
+      results.push({ row: lead.row, name: lead.name, ok: true, templateId: template.templateId });
     } catch (err) {
       // Sengaja TIDAK menandai EmailSentAt kalau gagal kirim -- biar dicoba
       // lagi di panggilan cron berikutnya, bukan dianggap "sudah" padahal gagal.
