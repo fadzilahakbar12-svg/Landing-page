@@ -34,17 +34,25 @@ export async function POST(request) {
     // Gambar itu "bonus" -- kalau gagal (mis. kena safety filter, atau
     // GEMINI_API_KEY sedang bermasalah), template TEKS-nya tetap tersimpan
     // dan dipakai seperti biasa. Jangan sampai satu gagal menjatuhkan semua.
+    //
+    // Dimatikan lewat ENABLE_TEMPLATE_IMAGES (default: off) sampai billing
+    // buat model image generation Gemini diaktifkan di sisi akun -- tanpa
+    // flag ini tiap generate selalu nunggu lalu gagal 429 (quota), buang
+    // waktu percuma. Tinggal set ENABLE_TEMPLATE_IMAGES=1 kalau sudah siap,
+    // tidak perlu ubah kode lagi.
     let assetUrl = null;
     let assetError = null;
-    try {
-      const image = await generateTemplateImageWithAI({ channel, stage, subject: generated.subject, body: generated.body });
-      if (image) {
-        assetUrl = await saveTemplateAsset(templateId, image);
-      } else {
-        assetError = "Gemini tidak menghasilkan gambar (kemungkinan kena safety filter).";
+    if (process.env.ENABLE_TEMPLATE_IMAGES === "1") {
+      try {
+        const image = await generateTemplateImageWithAI({ channel, stage, subject: generated.subject, body: generated.body });
+        if (image) {
+          assetUrl = await saveTemplateAsset(templateId, image);
+        } else {
+          assetError = "Gemini tidak menghasilkan gambar (kemungkinan kena safety filter).";
+        }
+      } catch (err) {
+        assetError = String(err.message || err);
       }
-    } catch (err) {
-      assetError = String(err.message || err);
     }
 
     return Response.json({ ok: true, templateId, ...generated, assetUrl, assetError });
