@@ -1,6 +1,10 @@
 import { fetchSites, updateSiteStats } from "@/lib/sites";
 import { scanSite } from "@/lib/scraper";
 import { getEngineState } from "@/lib/engine";
+import { validateScanResult } from "@/lib/schemaValidator";
+import { recordJobRun } from "@/lib/jobHealth";
+
+const JOB_NAME = "scrape";
 
 // 1 invocation = scan 1 situs saja (bukan seluruh watchlist sekaligus) --
 // dijadwalkan jalan berkali-kali sepanjang jam kerja (lihat vercel.json),
@@ -39,12 +43,14 @@ export async function GET(request) {
   // (cuma toggle 1 flag), bukan harus daftar/hapus jadwal cron sungguhan.
   const engineEnabled = await getEngineState();
   if (!engineEnabled) {
+    await recordJobRun(JOB_NAME, { status: "skipped", meta: "engine off" });
     return Response.json({ ok: true, skipped: true, reason: "Engine sedang mati (belum diaktifkan dari dashboard)." });
   }
 
   const sites = await fetchSites();
   const site = pickNextSite(sites);
   if (!site) {
+    await recordJobRun(JOB_NAME, { status: "skipped", meta: "no eligible site" });
     return Response.json({ ok: true, message: "Tidak ada situs eligible untuk di-scan (watchlist kosong atau semua perlu manual)." });
   }
 
@@ -56,13 +62,26 @@ export async function GET(request) {
     // terus-menerus "dipilih duluan" tiap tick karena dianggap paling lama
     // belum di-scan (lihat pickNextSite).
     await updateSiteStats(site.domain, { jobsFound: 0, successRate: 0 });
+    await recordJobRun(JOB_NAME, { status: "error", error: err, meta: site.domain });
     return Response.json({ ok: false, domain: site.domain, error: String(err) }, { status: 502 });
+  }
+
+  // Schema Validator -- cek hasil scan SEBELUM dianggap "sukses begitu saja".
+  // site (dari fetchSites di atas) masih punya successRate scan SEBELUMNYA di
+  // sini, dipakai sebagai baseline pembanding.
+  const validation = validateScanResult(site, result);
+  if (validation.issues.length) {
+    // console.warn (bukan .error) -- ini bukan kegagalan cron-nya, tapi sinyal
+    // kualitas data yang perlu ditindaklanjuti manual. Prefix [SchemaValidator]
+    // supaya gampang di-grep di Vercel logs.
+    console.warn(`[SchemaValidator] ${site.domain}:`, validation.issues.join(" | "));
   }
 
   await updateSiteStats(site.domain, {
     jobsFound: result.jobsFound,
     successRate: result.successRate,
     needsManualScrape: result.needsManualScrape,
+    schemaIssue: validation.schemaIssue,
   });
 
   // Kirim tiap lead yang lolos filter lewat endpoint /api/lead yang sudah ada
@@ -91,6 +110,12 @@ export async function GET(request) {
     }
   }
 
+  await recordJobRun(JOB_NAME, {
+    status: validation.issues.length ? "ok-with-warnings" : "ok",
+    error: validation.issues.length ? validation.schemaIssue : "",
+    meta: `${site.domain} | jobsFound=${result.jobsFound} leadsSent=${leadsSent}`,
+  });
+
   return Response.json({
     ok: true,
     domain: site.domain,
@@ -98,5 +123,6 @@ export async function GET(request) {
     successRate: result.successRate,
     needsManualScrape: result.needsManualScrape,
     leadsSent,
+    schemaIssue: validation.schemaIssue || null,
   });
 }

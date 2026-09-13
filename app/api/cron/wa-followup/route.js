@@ -1,6 +1,9 @@
 import { fetchLeads, markLeadFollowedUp, setLeadWaMeta } from "@/lib/leads";
 import { isWhatsappNumber, sendBulkFollowUpWhatsapp } from "@/lib/notify";
 import { getEngineState } from "@/lib/engine";
+import { recordJobRun } from "@/lib/jobHealth";
+
+const JOB_NAME = "wa-followup";
 
 // WhatsApp-only pipeline -- split from email on purpose (see email-followup/route.js).
 // Cold WhatsApp outreach needs a much tighter volume cap than email to avoid
@@ -21,6 +24,7 @@ export async function GET(request) {
   // paling lama -- tidak perlu logic prioritas tambahan.
   const engineEnabled = await getEngineState();
   if (!engineEnabled) {
+    await recordJobRun(JOB_NAME, { status: "skipped", meta: "engine off" });
     return Response.json({ ok: true, skipped: true, reason: "Engine sedang mati (belum diaktifkan dari dashboard)." });
   }
 
@@ -76,6 +80,13 @@ export async function GET(request) {
       }
     }
   }
+
+  const errorCount = results.filter((r) => !r.ok).length;
+  await recordJobRun(JOB_NAME, {
+    status: errorCount === 0 ? "ok" : errorCount === results.length && results.length > 0 ? "error" : "ok-with-warnings",
+    error: errorCount ? `${errorCount}/${results.length} lead gagal` : "",
+    meta: `processed=${results.length}`,
+  });
 
   return Response.json({ ok: true, processed: results.length, results });
 }

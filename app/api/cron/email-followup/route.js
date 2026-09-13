@@ -1,6 +1,9 @@
 import { fetchLeads, markLeadEmailSent } from "@/lib/leads";
 import { sendFollowUpEmail } from "@/lib/notify";
 import { getEngineState } from "@/lib/engine";
+import { recordJobRun } from "@/lib/jobHealth";
+
+const JOB_NAME = "email-followup";
 
 // Email-only pipeline -- split from WhatsApp on purpose (see wa-followup/route.js).
 // Sekarang jalan 2 batch/hari (sama seperti WA) dalam jam operasional 09.00-
@@ -33,6 +36,7 @@ export async function GET(request) {
 
   const engineEnabled = await getEngineState();
   if (!engineEnabled) {
+    await recordJobRun(JOB_NAME, { status: "skipped", meta: "engine off" });
     return Response.json({ ok: true, skipped: true, reason: "Engine sedang mati (belum diaktifkan dari dashboard)." });
   }
 
@@ -51,6 +55,13 @@ export async function GET(request) {
       results.push({ row: lead.row, name: lead.name, ok: false, error: String(err) });
     }
   }
+
+  const errorCount = results.filter((r) => !r.ok).length;
+  await recordJobRun(JOB_NAME, {
+    status: errorCount === 0 ? "ok" : errorCount === results.length && results.length > 0 ? "error" : "ok-with-warnings",
+    error: errorCount ? `${errorCount}/${results.length} lead gagal` : "",
+    meta: `processed=${results.length}`,
+  });
 
   return Response.json({ ok: true, processed: results.length, results });
 }

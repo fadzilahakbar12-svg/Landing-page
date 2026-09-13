@@ -2,6 +2,7 @@ import { Fraunces, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import { fetchLeads } from "@/lib/leads";
 import { fetchSites } from "@/lib/sites";
 import { getEngineState } from "@/lib/engine";
+import { fetchJobHealth } from "@/lib/jobHealth";
 import AddSiteForm from "./AddSiteForm";
 import EngineToggle from "./EngineToggle";
 import StatsPanel from "./StatsPanel";
@@ -52,6 +53,30 @@ function formatSuccessRate(value) {
   return `${Math.round(num * 100)}%`;
 }
 
+// Label tampilan + urutan tetap untuk panel "Kesehatan Job" (Scheduler/Uptime
+// Agent) -- daftar ini HARUS mengikuti nama jobName yang dipakai tiap route
+// cron (lihat const JOB_NAME di masing-masing app/api/cron/*/route.js).
+const JOB_LABELS = {
+  scrape: "Scraper (situs loker)",
+  "wa-followup": "Follow-up WhatsApp",
+  "email-followup": "Follow-up Email",
+  "snapshot-stats": "Snapshot Statistik",
+  "uptime-check": "Uptime Agent (dirinya sendiri)",
+};
+const JOB_ORDER = ["scrape", "wa-followup", "email-followup", "snapshot-stats", "uptime-check"];
+
+const JOB_STATUS_META = {
+  ok: { label: "OK", cls: "db-prio-tinggi" },
+  skipped: { label: "Dilewati (engine mati)", cls: "db-prio-baru" },
+  "ok-with-warnings": { label: "OK, ada peringatan", cls: "db-prio-sedang" },
+  "problems-found": { label: "Ada masalah ditemukan", cls: "db-prio-sedang" },
+  error: { label: "Error", cls: "db-prio-alert" },
+};
+
+function jobStatusMeta(status) {
+  return JOB_STATUS_META[status] || { label: status || "belum pernah jalan", cls: "db-prio-rendah" };
+}
+
 function formatRelative(dateValue) {
   if (!dateValue) return "belum pernah";
   const d = new Date(dateValue);
@@ -83,6 +108,14 @@ export default async function DashboardPage() {
     sitesError = String(err);
   }
 
+  let jobs = [];
+  let jobsError = null;
+  try {
+    jobs = await fetchJobHealth();
+  } catch (err) {
+    jobsError = String(err);
+  }
+
   let engineEnabled = false;
   try {
     engineEnabled = await getEngineState();
@@ -94,6 +127,9 @@ export default async function DashboardPage() {
   const sortedSites = [...sites].sort(
     (a, b) => (PRIORITY_ORDER[a.priority] ?? 4) - (PRIORITY_ORDER[b.priority] ?? 4)
   );
+
+  const jobsByName = Object.fromEntries(jobs.map((j) => [j.jobName, j]));
+  const orderedJobs = JOB_ORDER.map((name) => ({ name, job: jobsByName[name] || null }));
 
   // Cuma field yang benar-benar dibutuhkan StatsPanel untuk hitung ulang di
   // client (rentang pill + kalender custom) -- nama/WA/email lead SENGAJA
@@ -164,6 +200,11 @@ export default async function DashboardPage() {
                     <td>
                       <span className="db-site-name">{site.domain}</span>
                       {site.needsManualScrape && <span className="flag">perlu manual (BarScraper)</span>}
+                      {site.schemaIssue && (
+                        <span className="flag" title={site.schemaIssue}>
+                          ⚠ kemungkinan situs berubah struktur — cek manual
+                        </span>
+                      )}
                     </td>
                     <td className="db-num">{site.jobsFound || "—"}</td>
                     <td className="db-num">{formatSuccessRate(site.successRate)}</td>
@@ -175,6 +216,45 @@ export default async function DashboardPage() {
                     <td className="db-num">{formatRelative(site.lastScanned)}</td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="db-section-head">
+          <h2>Kesehatan Job</h2>
+          <span className="db-hint">Scheduler/Uptime Agent — apakah cron benar-benar jalan sesuai jadwal</span>
+        </div>
+
+        {jobsError && <div className="db-error">Gagal memuat status job: {jobsError}</div>}
+
+        {!jobsError && (
+          <div className="db-table-wrap">
+            <table className="db-table">
+              <thead>
+                <tr>
+                  <th>Job</th>
+                  <th>Status Terakhir</th>
+                  <th>Terakhir Jalan</th>
+                  <th>Catatan</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orderedJobs.map(({ name, job }) => {
+                  const meta = jobStatusMeta(job?.lastStatus);
+                  return (
+                    <tr key={name}>
+                      <td>
+                        <span className="db-site-name">{JOB_LABELS[name] || name}</span>
+                      </td>
+                      <td>
+                        <span className={`db-prio ${meta.cls}`}>{meta.label}</span>
+                      </td>
+                      <td className="db-num">{formatRelative(job?.lastRunAt)}</td>
+                      <td>{job?.lastError || job?.meta || "—"}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

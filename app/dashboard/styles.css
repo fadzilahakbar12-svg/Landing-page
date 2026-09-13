@@ -634,6 +634,9 @@ table.db-table {
 .db-prio-rendah { background: var(--db-panel-2); color: var(--db-ink-dim); border: 1px solid var(--db-line); }
 .db-prio-baru { background: transparent; color: var(--db-ink-dim); border: 1px dashed var(--db-line); }
 .db-prio-baru::before { background: transparent; border: 1px dashed currentColor; }
+/* Kesehatan job (Scheduler/Uptime Agent) -- badge tambahan, warna alert (merah)
+   belum ada padanannya di set db-prio-* di atas. */
+.db-prio-alert { background: var(--db-alert-dim); color: var(--db-alert); }
 
 @media (max-width: 640px) {
   .db-table-wrap { overflow-x: auto; }

@@ -39,6 +39,14 @@
     {
       "path": "/api/cron/snapshot-stats",
       "schedule": "55 16 * * *"
+    },
+    {
+      "path": "/api/cron/uptime-check",
+      "schedule": "0 11 * * 1-5"
+    },
+    {
+      "path": "/api/cron/uptime-check",
+      "schedule": "30 17 * * *"
     }
   ]
 }

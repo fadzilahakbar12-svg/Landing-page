@@ -1,6 +1,9 @@
 import { fetchLeads } from "@/lib/leads";
 import { computeWaCounts, waFunnel, emailFunnel } from "@/lib/metrics";
 import { recordStatsSnapshot } from "@/lib/statsHistory";
+import { recordJobRun } from "@/lib/jobHealth";
+
+const JOB_NAME = "snapshot-stats";
 
 // Sekali/hari (lihat vercel.json) -- mencatat 1 baris ringkasan metrik hari
 // ini ke StatsHistory, TIDAK dipengaruhi status engine (berbeda dari 3 cron
@@ -13,21 +16,27 @@ export async function GET(request) {
     return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const leads = await fetchLeads();
-  const waCounts = computeWaCounts(leads);
-  const wa = waFunnel(waCounts);
-  const email = emailFunnel(leads);
+  try {
+    const leads = await fetchLeads();
+    const waCounts = computeWaCounts(leads);
+    const wa = waFunnel(waCounts);
+    const email = emailFunnel(leads);
 
-  await recordStatsSnapshot({
-    totalLeads: leads.length,
-    waSent: wa.sent,
-    waRead: wa.read,
-    waConnected: wa.connected,
-    waFail: waCounts.fail,
-    emailSent: email.sent,
-    emailOpened: email.opened,
-    emailClicked: email.clicked,
-  });
+    await recordStatsSnapshot({
+      totalLeads: leads.length,
+      waSent: wa.sent,
+      waRead: wa.read,
+      waConnected: wa.connected,
+      waFail: waCounts.fail,
+      emailSent: email.sent,
+      emailOpened: email.opened,
+      emailClicked: email.clicked,
+    });
 
-  return Response.json({ ok: true, totalLeads: leads.length });
+    await recordJobRun(JOB_NAME, { status: "ok", meta: `totalLeads=${leads.length}` });
+    return Response.json({ ok: true, totalLeads: leads.length });
+  } catch (err) {
+    await recordJobRun(JOB_NAME, { status: "error", error: err });
+    return Response.json({ ok: false, error: String(err) }, { status: 502 });
+  }
 }
