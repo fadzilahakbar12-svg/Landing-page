@@ -7,6 +7,11 @@ import { getFirecrawlUsage } from "@/lib/firecrawl";
 
 const JOB_NAME = "scrape";
 
+// Default Next.js/Vercel jauh lebih pendek dari ini -- situs needsManualScrape
+// (lewat Firecrawl, yang render JS dan bisa makan 15-30+ detik per halaman)
+// butuh jatah lebih lega. 60 = maksimal yang diizinkan paket Vercel Hobby.
+export const maxDuration = 60;
+
 // 1 invocation = scan 1 situs saja (bukan seluruh watchlist sekaligus) --
 // dijadwalkan jalan berkali-kali sepanjang jam kerja (lihat vercel.json),
 // jadi watchlist ke-cover bertahap sepanjang hari tanpa 1 eksekusi jadi
