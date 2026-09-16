@@ -291,6 +291,24 @@ function doPost(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  // Pengaman kuota Firecrawl (free tier, 1000 credit/bulan) -- dipanggil
+  // SETELAH tiap panggilan Firecrawl sukses (lib/firecrawl.js). Disimpan
+  // lewat PropertiesService (2 nilai: bulan berjalan "YYYY-MM" + hitungan),
+  // reset otomatis kalau bulan berganti -- tidak perlu tab sheet baru untuk
+  // 2 angka ini.
+  if (data.action === "incrementFirecrawlUsage") {
+    var props = PropertiesService.getScriptProperties();
+    var curMonth = Utilities.formatDate(new Date(), "GMT+7", "yyyy-MM");
+    var storedMonth = props.getProperty("firecrawlUsageMonth");
+    var used = storedMonth === curMonth ? parseInt(props.getProperty("firecrawlUsageCount") || "0", 10) : 0;
+    used += 1;
+    props.setProperty("firecrawlUsageMonth", curMonth);
+    props.setProperty("firecrawlUsageCount", String(used));
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: true, month: curMonth, used: used }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   // ---- Template: perpustakaan pesan Email & WhatsApp ----
   if (data.action === "addTemplate") {
     var channel = String(data.channel || "").trim().toLowerCase();
@@ -550,6 +568,18 @@ function doGet(e) {
     }
     return ContentService
       .createTextOutput(JSON.stringify({ ok: true, sites: sites }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // ?resource=firecrawlUsage -- berapa credit Firecrawl yang sudah kepakai
+  // bulan ini (lihat action "incrementFirecrawlUsage" di atas).
+  if (e.parameter.resource === "firecrawlUsage") {
+    var props2 = PropertiesService.getScriptProperties();
+    var curMonth2 = Utilities.formatDate(new Date(), "GMT+7", "yyyy-MM");
+    var storedMonth2 = props2.getProperty("firecrawlUsageMonth");
+    var used2 = storedMonth2 === curMonth2 ? parseInt(props2.getProperty("firecrawlUsageCount") || "0", 10) : 0;
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: true, month: curMonth2, used: used2 }))
       .setMimeType(ContentService.MimeType.JSON);
   }
 

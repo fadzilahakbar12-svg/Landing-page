@@ -3,6 +3,7 @@ import { scanSite } from "@/lib/scraper";
 import { getEngineState } from "@/lib/engine";
 import { validateScanResult } from "@/lib/schemaValidator";
 import { recordJobRun } from "@/lib/jobHealth";
+import { getFirecrawlUsage } from "@/lib/firecrawl";
 
 const JOB_NAME = "scrape";
 
@@ -10,12 +11,13 @@ const JOB_NAME = "scrape";
 // dijadwalkan jalan berkali-kali sepanjang jam kerja (lihat vercel.json),
 // jadi watchlist ke-cover bertahap sepanjang hari tanpa 1 eksekusi jadi
 // terlalu lama/berat. Situs bertanda needsManualScrape (pola "Load More"/JS
-// berat, lihat detectLoadMoreButton di lib/extractor.js) di-skip permanen --
-// itu tetap perlu BarScraper manual.
+// berat, lihat detectLoadMoreButton di lib/extractor.js) TETAP ikut rotasi --
+// lib/scraper.js otomatis mengarahkan situs itu lewat Firecrawl (yang bisa
+// render JS), bukan di-skip permanen lagi.
 const PRIORITY_ORDER = { Tinggi: 0, Sedang: 1, Rendah: 2, Baru: 3 };
 
 function pickNextSite(sites) {
-  const eligible = sites.filter((s) => s.startUrl && !s.needsManualScrape);
+  const eligible = sites.filter((s) => s.startUrl);
   if (!eligible.length) return null;
 
   // Prioritas dulu, lalu di antara yang prioritasnya sama, dahulukan yang
@@ -52,6 +54,23 @@ export async function GET(request) {
   if (!site) {
     await recordJobRun(JOB_NAME, { status: "skipped", meta: "no eligible site" });
     return Response.json({ ok: true, message: "Tidak ada situs eligible untuk di-scan (watchlist kosong atau semua perlu manual)." });
+  }
+
+  // Situs needsManualScrape lewat Firecrawl (lib/scraper.js) -- cek kuota
+  // bulanan SEBELUM benar-benar mulai scan, bukan sesudahnya. scanSite()
+  // sendiri menelan error per-halaman (try/catch di dalamnya, supaya 1
+  // halaman gagal tidak menggagalkan seluruh scan situs), jadi kalau
+  // dibiarkan, kegagalan "kuota habis" akan diam-diam jadi hasil kosong
+  // (lastScanned ikut ke-update seolah beneran sudah di-scan) alih-alih
+  // ketahuan jelas di sini.
+  if (site.needsManualScrape) {
+    const cap = Number(process.env.FIRECRAWL_MONTHLY_CAP || 900);
+    const usage = await getFirecrawlUsage();
+    if (usage.used >= cap) {
+      const reason = `Kuota Firecrawl bulan ini sudah tercapai (${usage.used}/${cap}) -- situs "${site.domain}" (butuh Firecrawl) ditunda sampai bulan depan.`;
+      await recordJobRun(JOB_NAME, { status: "skipped", meta: reason });
+      return Response.json({ ok: true, skipped: true, domain: site.domain, reason });
+    }
   }
 
   let result;
