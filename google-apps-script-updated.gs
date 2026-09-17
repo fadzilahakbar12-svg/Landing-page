@@ -512,8 +512,13 @@ function doPost(e) {
     }
     var jobsFound = Number(data.jobsFound || 0);
     var successRate = Number(data.successRate || 0); // 0-1
+    // successRate sekarang ikut menentukan Sedang (bukan cuma Tinggi) --
+    // sebelumnya situs dengan jobsFound tinggi tapi successRate 0% (kontak
+    // tidak pernah ketemu, mis. bebee.com yang cuma bocorkan alamat generik
+    // situsnya sendiri) tetap dapat "Sedang" dan ikut berebut giliran scan
+    // sama posisi dengan situs yang BENERAN produktif -- buang-buang jatah.
     var priority = jobsFound >= 20 && successRate >= 0.8 ? "Tinggi"
-      : jobsFound >= 5 ? "Sedang"
+      : jobsFound >= 5 && successRate >= 0.3 ? "Sedang"
       : "Rendah";
 
     siteSheet2.getRange(rowIndex, 4).setValue(new Date());              // lastScanned
@@ -532,6 +537,62 @@ function doPost(e) {
     }
     return ContentService
       .createTextOutput(JSON.stringify({ ok: true }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // Kirim BANYAK lead sekaligus dalam 1 panggilan (dipakai /api/cron/scrape
+  // -- sebelumnya tiap lead hasil scan dikirim lewat request /api/lead
+  // TERPISAH satu-satu, yang berarti tiap lead = 1 round-trip Apps Script
+  // SENDIRI, DAN nextLeadId_ men-scan ULANG semua baris ID yang ada tiap kali
+  // dipanggil -- untuk 15 lead itu 15x scan penuh + 15x request terpisah.
+  // Di sini nomor urut LeadID dihitung SEKALI di awal lalu tinggal
+  // di-increment di memori, dan semua baris ditulis SEKALI lewat setValues --
+  // salah satu penyebab utama scrape lambat/kena timeout.
+  if (data.action === "addLeadsBatch") {
+    var batchLeads = Array.isArray(data.leads) ? data.leads : [];
+    var batchSource = data.source || "auto-scraper";
+    var batchPrefix = leadIdPrefix_(batchSource);
+
+    var batchLastRow = sheet.getLastRow();
+    var batchMaxN = 0;
+    if (batchLastRow > 1) {
+      var batchIdCol = sheet.getRange(2, 1, batchLastRow - 1, 1).getValues();
+      var batchRe = new RegExp("^" + batchPrefix + "-(\\d+)$");
+      for (var bi = 0; bi < batchIdCol.length; bi++) {
+        var bm = String(batchIdCol[bi][0]).match(batchRe);
+        if (bm) {
+          var bn = parseInt(bm[1], 10);
+          if (bn > batchMaxN) batchMaxN = bn;
+        }
+      }
+    }
+
+    var rowsToAppend = [];
+    var leadIds = [];
+    var now = new Date();
+    for (var li = 0; li < batchLeads.length; li++) {
+      var bLead = batchLeads[li] || {};
+      var bName = String(bLead.name || "").trim();
+      var bWhatsapp = String(bLead.whatsapp || "").trim();
+      var bEmail = String(bLead.email || "").trim();
+      if (!bName || (!bWhatsapp && !bEmail)) continue; // sama seperti validasi /api/lead
+
+      batchMaxN += 1;
+      var bPadded = batchMaxN < 1000 ? ("00" + batchMaxN).slice(-3) : String(batchMaxN);
+      var bLeadId = batchPrefix + "-" + bPadded;
+      leadIds.push(bLeadId);
+      rowsToAppend.push([bLeadId, now, bName, bWhatsapp, bEmail, "", "", "", batchSource, "", ""]);
+    }
+
+    if (rowsToAppend.length) {
+      sheet.getRange(sheet.getLastRow() + 1, 1, rowsToAppend.length, 11).setValues(rowsToAppend);
+    }
+
+    // TIDAK ada notifikasi email di sini (sama seperti default action di
+    // bawah untuk source selain "landing_page") -- batch dari scraper bisa
+    // belasan sekaligus, akan membanjiri inbox kalau tetap dikirim per-baris.
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: true, added: rowsToAppend.length, skipped: batchLeads.length - rowsToAppend.length, leadIds: leadIds }))
       .setMimeType(ContentService.MimeType.JSON);
   }
 

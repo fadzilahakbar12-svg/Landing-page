@@ -4,6 +4,7 @@ import { getEngineState } from "@/lib/engine";
 import { validateScanResult } from "@/lib/schemaValidator";
 import { recordJobRun } from "@/lib/jobHealth";
 import { getFirecrawlUsage } from "@/lib/firecrawl";
+import { addLeadsBatch } from "@/lib/leads";
 
 const JOB_NAME = "scrape";
 
@@ -108,29 +109,25 @@ export async function GET(request) {
     schemaIssue: validation.schemaIssue,
   });
 
-  // Kirim tiap lead yang lolos filter lewat endpoint /api/lead yang sudah ada
-  // -- reuse validasi & penandaan source, bukan tulis ulang logic-nya di sini.
-  const baseUrl = new URL(request.url).origin;
+  // Kirim SEMUA lead yang lolos filter dalam 1 panggilan batch (bukan 1
+  // request /api/lead per lead seperti sebelumnya) -- untuk 15 lead itu tadinya
+  // 15 round-trip Apps Script TERPISAH, masing-masing men-scan ulang semua
+  // LeadID yang ada. Salah satu penyebab utama scrape lambat/kena timeout,
+  // lihat catatan di action "addLeadsBatch" Apps Script.
   let leadsSent = 0;
-  for (const lead of result.leads) {
+  if (result.leads.length) {
     try {
-      const res = await fetch(`${baseUrl}/api/lead`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: lead.company,
-          whatsapp: lead.whatsapp || "",
-          email: lead.email || "",
-          // Link ke HOMEPAGE situs sumber (bukan link halaman lowongan
-          // spesifiknya) -- ini yang jadi isi kolom "source" di sheet, dan
-          // domainnya dipakai Apps Script untuk bikin inisial LeadID (mis.
-          // dealls.com -> "DS").
-          source: `https://${site.domain}`,
-        }),
-      });
-      if (res.ok) leadsSent++;
+      const batchResult = await addLeadsBatch(
+        result.leads.map((lead) => ({ name: lead.company, whatsapp: lead.whatsapp || "", email: lead.email || "" })),
+        // Link ke HOMEPAGE situs sumber (bukan link halaman lowongan
+        // spesifiknya) -- ini yang jadi isi kolom "source" di sheet, dan
+        // domainnya dipakai Apps Script untuk bikin inisial LeadID (mis.
+        // dealls.com -> "DS").
+        `https://${site.domain}`
+      );
+      leadsSent = batchResult.added;
     } catch (err) {
-      // 1 lead gagal terkirim bukan alasan menghentikan sisanya
+      console.error(`[scrape] Gagal kirim batch lead untuk ${site.domain}:`, String(err));
     }
   }
 
