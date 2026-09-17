@@ -29,16 +29,21 @@ export default function DedupeLeadsButton() {
   }
 
   return (
-    <span className="db-add-site-form" style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-      <button onClick={handleClick} disabled={status === "loading"} className="db-add-site-btn">
-        {status === "loading" ? "Membersihkan..." : "🧹 Bersihkan Duplikat"}
+    <>
+      <button
+        onClick={handleClick}
+        disabled={status === "loading"}
+        className="db-btn-ghost"
+        style={{ cursor: "pointer", opacity: status === "loading" ? 0.6 : 1 }}
+      >
+        🧹 {status === "loading" ? "Membersihkan..." : "Bersihkan Duplikat"}
       </button>
       {lastResult !== null && (
         <span className="db-hint">
-          {lastResult === 0 ? "Tidak ada duplikat ditemukan." : `${lastResult} baris duplikat dihapus.`}
+          {lastResult === 0 ? "Tidak ada duplikat." : `${lastResult} duplikat dihapus.`}
         </span>
       )}
-      {error && <span className="db-add-site-error">{error}</span>}
-    </span>
+      {error && <span className="db-hint" style={{ color: "var(--db-alert)" }}>{error}</span>}
+    </>
   );
 }
