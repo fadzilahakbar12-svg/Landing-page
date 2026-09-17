@@ -6,6 +6,7 @@ import { fetchJobHealth } from "@/lib/jobHealth";
 import { fetchTemplates, recomputeAndSaveScores } from "@/lib/templates";
 import AddSiteForm from "./AddSiteForm";
 import TemplateGenerateForm from "./TemplateGenerateForm";
+import DedupeLeadsButton from "./DedupeLeadsButton";
 import EngineToggle from "./EngineToggle";
 import StatsPanel from "./StatsPanel";
 import CursorGlow from "./CursorGlow";
@@ -187,6 +188,7 @@ export default async function DashboardPage() {
             <a href={BANK_DATA_URL} target="_blank" rel="noopener noreferrer" className="db-btn-ghost">
               🔗 Buka Bank Data
             </a>
+            <DedupeLeadsButton />
             <EngineToggle initialEnabled={engineEnabled} />
           </div>
         </div>

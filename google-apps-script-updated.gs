@@ -309,6 +309,55 @@ function doPost(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  // Hapus baris duplikat di Leads (Sheet1). Aturan (per keputusan operator):
+  //   - nama perusahaan (kolom C) SAMA + email (kolom E) SAMA -> baris
+  //     berikutnya dianggap duplikat, DIHAPUS.
+  //   - nama perusahaan SAMA + whatsapp (kolom D) SAMA -> sama, DIHAPUS.
+  //   - nama perusahaan SAMA tapi email BEDA dan whatsapp BEDA -> BUKAN
+  //     duplikat, dua-duanya tetap ada (kontak berbeda di perusahaan yang sama
+  //     itu sah, mis. 2 rekruter berbeda).
+  // Baris yang DIPERTAHANKAN selalu yang PALING ATAS/PALING LAMA (baris
+  // duplikat yang datang belakangan yang dihapus) -- dicek satu kali jalan
+  // dari atas ke bawah, bukan bolak-balik.
+  if (data.action === "dedupeLeads") {
+    var dedupeSheet = getLeadsSheet_();
+    var dedupeRows = dedupeSheet.getDataRange().getValues();
+    var seenByEmail = {};    // "company|email" -> true (cuma dari baris yang DIPERTAHANKAN)
+    var seenByWhatsapp = {}; // "company|whatsapp" -> true
+    var rowsToDelete = [];   // nomor baris sheet (1-based), urut naik
+    var removed = [];
+
+    for (var dr = 1; dr < dedupeRows.length; dr++) {
+      var rowNum = dr + 1;
+      var company = String(dedupeRows[dr][2] || "").trim().toLowerCase();
+      var whatsapp = String(dedupeRows[dr][3] || "").replace(/\D/g, "");
+      var email = String(dedupeRows[dr][4] || "").trim().toLowerCase();
+      if (!company) continue; // baris kosong/rusak, jangan diapa-apakan
+
+      var emailKey = email ? company + "|" + email : null;
+      var waKey = whatsapp ? company + "|" + whatsapp : null;
+
+      var isDup = (emailKey && seenByEmail[emailKey]) || (waKey && seenByWhatsapp[waKey]);
+      if (isDup) {
+        rowsToDelete.push(rowNum);
+        removed.push({ leadId: dedupeRows[dr][0], company: dedupeRows[dr][2], email: dedupeRows[dr][4], whatsapp: dedupeRows[dr][3] });
+      } else {
+        if (emailKey) seenByEmail[emailKey] = true;
+        if (waKey) seenByWhatsapp[waKey] = true;
+      }
+    }
+
+    // Hapus dari BAWAH ke ATAS -- kalau dari atas, nomor baris di bawahnya
+    // ikut geser dan rowsToDelete jadi salah sasaran.
+    for (var rd = rowsToDelete.length - 1; rd >= 0; rd--) {
+      dedupeSheet.deleteRow(rowsToDelete[rd]);
+    }
+
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: true, removedCount: removed.length, removed: removed }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   // ---- Template: perpustakaan pesan Email & WhatsApp ----
   if (data.action === "addTemplate") {
     var channel = String(data.channel || "").trim().toLowerCase();
