@@ -14,6 +14,7 @@ var SITESTATS_SHEET_NAME = "SiteStats";
 var STATSHISTORY_SHEET_NAME = "StatsHistory";
 var JOBHEALTH_SHEET_NAME = "JobHealth";
 var TEMPLATE_SHEET_NAME = "Template";
+var LICENSE_SHEET_NAME = "LicenseCheckins";
 
 // Skema kolom leads (sejak LeadID ditambahkan di kolom A, semua kolom lain
 // geser +1 dari sebelumnya):
@@ -72,6 +73,22 @@ function getTemplateSheet_() {
     // schemaIssue/waTemplateId/emailTemplateId.
     sheet.appendRow(["templateID", "channel", "stage", "subject", "body", "score", "timesUsed", "lastScored", "asset"]);
     sheet.getRange("A1:I1").setFontWeight("bold");
+  }
+  return sheet;
+}
+
+// Verifikasi lisensi extension BarScraper -- TAB TERPISAH dari Leads, cuma
+// mencatat device ID acak + versi extension, TIDAK PERNAH menyimpan data
+// leads/scrape apapun. Tujuannya: menghitung jumlah device aktif vs lisensi
+// yang Anda terbitkan, secara TERBUKA (tampil di popup extension sebagai
+// "🔐 Lisensi terverifikasi", bukan mekanisme tersembunyi).
+function getLicenseSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(LICENSE_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(LICENSE_SHEET_NAME);
+    sheet.appendRow(["deviceId", "firstSeenAt", "lastSeenAt", "version", "checkinCount"]);
+    sheet.getRange("A1:E1").setFontWeight("bold");
   }
   return sheet;
 }
@@ -285,6 +302,33 @@ function doPost(e) {
       jhSheet.appendRow(jhValues);
     } else {
       jhSheet.getRange(jhRowIndex, 1, 1, jhValues.length).setValues([jhValues]);
+    }
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: true }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // Dipanggil extension BarScraper (popup.js#verifyLicense) tiap kali popup
+  // dibuka -- upsert berdasarkan deviceId (1 baris tetap per device, bukan
+  // log yang terus bertambah). Endpoint publik /api/license/checkin di sisi
+  // Next.js yang menyisipkan `secret` ini server-side (lib/license.js) --
+  // extension sendiri TIDAK PERNAH tahu/menyimpan secret ini, sama seperti
+  // pola /api/lead.
+  if (data.action === "recordLicenseCheckin") {
+    var licSheet = getLicenseSheet_();
+    var licRows = licSheet.getDataRange().getValues();
+    var licRowIndex = -1;
+    for (var lc = 1; lc < licRows.length; lc++) {
+      if (String(licRows[lc][0]) === String(data.deviceId)) { licRowIndex = lc + 1; break; }
+    }
+    var now2 = new Date();
+    if (licRowIndex === -1) {
+      licSheet.appendRow([String(data.deviceId), now2, now2, String(data.version || ""), 1]);
+    } else {
+      licSheet.getRange(licRowIndex, 3).setValue(now2); // lastSeenAt
+      licSheet.getRange(licRowIndex, 4).setValue(String(data.version || "")); // version (paling baru)
+      var prevCount = Number(licRows[licRowIndex - 1][4] || 0);
+      licSheet.getRange(licRowIndex, 5).setValue(prevCount + 1); // checkinCount
     }
     return ContentService
       .createTextOutput(JSON.stringify({ ok: true }))
@@ -736,6 +780,27 @@ function doGet(e) {
     }
     return ContentService
       .createTextOutput(JSON.stringify({ ok: true, templates: templates }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // ?resource=licenseCheckins -- daftar device yang pernah checkin lisensi
+  // extension BarScraper (lihat action "recordLicenseCheckin" di atas).
+  if (e.parameter.resource === "licenseCheckins") {
+    var licSheet2 = getLicenseSheet_();
+    var licRows2 = licSheet2.getDataRange().getValues();
+    var checkins = [];
+    for (var lr = 1; lr < licRows2.length; lr++) {
+      if (!licRows2[lr][0]) continue;
+      checkins.push({
+        deviceId: licRows2[lr][0],
+        firstSeenAt: licRows2[lr][1] || null,
+        lastSeenAt: licRows2[lr][2] || null,
+        version: licRows2[lr][3] || "",
+        checkinCount: Number(licRows2[lr][4] || 0),
+      });
+    }
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: true, checkins: checkins }))
       .setMimeType(ContentService.MimeType.JSON);
   }
 
